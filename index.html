@@ -300,13 +300,13 @@
                     <div class="space-y-3">
                         <div class="flex gap-2">
                             <input type="password" id="input-new-pass-admin" maxlength="6" placeholder="新 6 位數管理者密碼" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
-                            <button onclick="changeAppPassword('admin')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
+                            <button onclick="changetripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPassword('admin')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
                                 修改主管
                             </button>
                         </div>
                         <div class="flex gap-2">
                             <input type="password" id="input-new-pass-guest" maxlength="6" placeholder="新 6 位數訪客密碼" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
-                            <button onclick="changeAppPassword('guest')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
+                            <button onclick="changetripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPassword('guest')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
                                 修改訪客
                             </button>
                         </div>
@@ -334,7 +334,7 @@
         let hasUnsyncedChanges = false; // ✨ [新增] 離線變更防丟失旗標 ✨
         
         // --- 密碼變數 ---
-        let appPass = localStorage.getItem('appPass') || "000000"; // 初始管理者密碼 000000
+        let tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass = localStorage.getItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass') || "000000"; // 初始管理者密碼 000000
         let guestPass = localStorage.getItem('guestPass') || "111111"; // ✨ [新增] 初始訪客密碼 111111 ✨
         let currentUserRole = 'admin'; // ✨ [新增] 記錄當前登入身分 ✨
         let currentInput = "";
@@ -346,7 +346,7 @@
         
         
         // ✨ [新增] 動態旅遊成員名單與 UI 渲染函數 ✨
-        let members = []; // 預設名單，未來會透過 API 從雲端試算表的 Members 分頁動態同步下載
+        let members = ["爸爸", "媽媽", "女兒"]; // 預設名單，未來會透過 API 從雲端試算表的 Members 分頁動態同步下載
         window.currentPublicPayers = []; // ✨ [新增] 儲存從雲端同步下載的有交公費人員名單 ✨
         window.memberDetailsList = []; // ✨ [新增] 儲存從雲端同步下載的成員加入日期明細表 ✨
 
@@ -472,7 +472,7 @@
             // ✨ [修改] 替換為載入新的旅程代碼設定 ✨
             loadTripConfig();
             
-            const saved = localStorage.getItem('expenseRecords');
+            const saved = localStorage.getItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords');
             if (saved) { 
                 records = JSON.parse(saved); 
                 records.forEach(r => { 
@@ -850,7 +850,7 @@
                 records.push(newRecord);
             }
             
-            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
             closeAddModal();
             renderAll();
        
@@ -882,7 +882,7 @@
             if(!editingRecordId) return;
             const targetId = editingRecordId;
             records = records.filter(r => r.id !== targetId);
-            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
             closeAddModal(); 
             renderAll(); 
             
@@ -1043,7 +1043,7 @@
             currentTripId = newId;
             localStorage.setItem('tripSplit_tripId', currentTripId);
             records = []; // 切換專案時先清空畫面
-            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
             showSettingsMsg("代碼切換中...");
             renderAll();
             renderIdentitySelect(); // 刷新選單
@@ -1100,14 +1100,14 @@
                         records = data.transactions;
                         // ✨ [修正] 將雲端下載的數值 ID 強制轉回字串，徹底解除編輯鎖死 Bug ✨
                         records.forEach(r => r.id = String(r.id));
-                        localStorage.setItem('expenseRecords', JSON.stringify(records));
+                        localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
                     }
                     
                     // ✨ [新增] 雲端強制銷毀 (Kill Switch) 驗證 ✨
                     // 若本機有綁定身分，但該身分已不存在於雲端傳回的活躍名單中 (被設為 Left 或刪除)
                     if (myIdentity && members.length > 0 && !members.includes(myIdentity)) {
                         alert("⚠️ 系統警告：您的帳號已被標記為離隊或專案已結案。本地資料將立即銷毀並登出。");
-                        localStorage.removeItem('expenseRecords');
+                        localStorage.removeItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords');
                         localStorage.removeItem('tripSplit_tripId');
                         localStorage.removeItem('tripSplit_myIdentity');
                         location.reload(); // 強制重整自爆清空權限
@@ -1146,7 +1146,7 @@
                     if (Array.isArray(im)) { 
                         records = im; 
                         records.forEach(r=>{if(!r.type)r.type='expense'; if(!r.currency)r.currency='TWD';}); 
-                        localStorage.setItem('expenseRecords', JSON.stringify(records)); 
+                        localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records)); 
                         showSettingsMsg("還原成功！"); 
                         renderAll(); 
                         
@@ -1168,7 +1168,7 @@
             
             if (currentInput.length === 6) {
                 setTimeout(() => {
-                    if (currentInput === appPass) {
+                    if (currentInput === tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass) {
                         currentUserRole = 'admin'; // ✨ [新增] 辨識為管理者 ✨
                         unlockApp();
                     } else if (currentInput === guestPass) {
@@ -1205,7 +1205,7 @@
             setTimeout(() => { overlay.classList.add('hidden'); }, 400);
         }
 
-        function changeAppPassword(type) {
+        function changetripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPassword(type) {
             const inputId = type === 'admin' ? 'input-new-pass-admin' : 'input-new-pass-guest';
             const newVal = document.getElementById(inputId).value.trim();
             if (newVal.length !== 6 || isNaN(newVal)) {
@@ -1213,8 +1213,8 @@
                 return;
             }
             if (type === 'admin') {
-                appPass = newVal;
-                localStorage.setItem('appPass', newVal);
+                tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass = newVal;
+                localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass', newVal);
                 showSettingsMsg("管理者密碼更新成功！");
             } else {
                 guestPass = newVal;
