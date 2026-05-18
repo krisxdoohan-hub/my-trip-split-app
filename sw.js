@@ -8,7 +8,7 @@ const CACHE_NAME = `trip-split-cache-${SW_VERSION}`;
 
 // 需要快取的核心檔案清單
 const urlsToCache = [
-  './index-TripSplit-v1.html',
+  './index.html',
   './manifest.json'
 ];
 
