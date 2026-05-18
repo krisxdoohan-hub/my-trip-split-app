@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>簡易記帳本 </title>
+    <link rel="manifest" href="./manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { overscroll-behavior-y: none; -webkit-overflow-scrolling: touch; background-color: #f8fafc; }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* 動態圓餅圖基礎設定 */
+        .donut-chart { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(#e2e8f0 0% 100%); position: relative; }
+        .donut-chart::before { content: ""; position: absolute; inset: 20px; background-color: #ffffff; border-radius: 50%; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body class="text-gray-800 font-sans antialiased h-[100dvh] flex flex-col relative overflow-hidden">
+
+    <!-- 讀取遮罩 -->
+    <div id="loading-overlay" class="fixed inset-0 bg-indigo-900/80 z-[100] hidden flex-col justify-center items-center text-white backdrop-blur-sm">
+        <div class="spinner mb-4 w-10 h-10 border-4"></div>
+        <p id="loading-text" class="font-bold tracking-wider">處理中...</p>
+    </div>
+
+    <!-- 密碼解鎖畫面 (預設顯示) -->
+    <div id="lock-screen" class="fixed inset-0 bg-indigo-950 z-[200] flex flex-col justify-center items-center text-white p-6 transition-all duration-300">
+        <div class="w-full max-w-xs text-center space-y-10">
+            <div class="flex flex-col items-center gap-4">
+                <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center border border-white/20 shadow-xl">
+                    <i class="ph ph-lock-key text-4xl text-indigo-300"></i>
+                </div>
+                <h2 class="text-2xl font-black tracking-widest text-white">私人記帳簿</h2>
+                <p class="text-xs text-indigo-200 font-medium opacity-60">請輸入解鎖密碼</p>
+            </div>
+            
+            <div class="flex justify-center gap-4 py-4" id="pass-dots">
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 px-4">
+                <button onclick="inputPass('1')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">1</button>
+                <button onclick="inputPass('2')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">2</button>
+                <button onclick="inputPass('3')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">3</button>
+                <button onclick="inputPass('4')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">4</button>
+                <button onclick="inputPass('5')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">5</button>
+                <button onclick="inputPass('6')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">6</button>
+                <button onclick="inputPass('7')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">7</button>
+                <button onclick="inputPass('8')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">8</button>
+                <button onclick="inputPass('9')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">9</button>
+                <div class="h-16"></div>
+                <button onclick="inputPass('0')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">0</button>
+                <button onclick="clearPass()" class="h-16 rounded-full text-red-300 font-bold active:scale-95 text-sm uppercase">清除</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-white px-4 py-3 shadow-sm z-30 flex justify-between items-center flex-shrink-0">
+        <div class="flex items-center gap-2 text-indigo-700">
+            <i class="ph ph-wallet text-2xl"></i>
+            <span class="font-bold tracking-widest">家計總覽</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="openSettlement()" class="text-indigo-500 hover:text-indigo-700 transition-colors p-1.5 rounded-full hover:bg-indigo-50 focus:outline-none" title="計算分帳結果">
+                <i class="ph ph-calculator text-2xl"></i>
+            </button>
+            <button id="cloud-status-icon" onclick="forceSyncDownload()" class="text-gray-300 transition-colors p-1.5 rounded-full hover:bg-gray-100 focus:outline-none" title="從雲端同步最新資料">
+                <i class="ph ph-cloud-slash text-2xl"></i>
+            </button>
+            <button onclick="openSettings()" class="text-gray-500 hover:text-indigo-600 transition-colors p-1.5 rounded-full hover:bg-indigo-50 focus:outline-none">
+                <i class="ph ph-gear text-2xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 relative">
+        <div class="max-w-5xl mx-auto">
+            
+            <header class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-3 mx-auto">
+                    <button onclick="changeMonth(-1)" class="p-2 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform">
+                        <i class="ph ph-caret-left text-gray-400"></i>
+                    </button>
+                    <div class="text-center min-w-[120px]">
+                        <p id="currentYearDisplay" class="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">2026</p>
+                        <button onclick="resetToToday()" class="group flex flex-col items-center w-full focus:outline-none">
+                            <h1 id="currentMonthDisplay" class="text-2xl font-black text-gray-800 leading-none group-active:scale-95 transition-transform">4月</h1>
+                            <span id="backTodayBtn" class="hidden text-[8px] font-black text-indigo-500 mt-1 bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-tighter">回到本月</span>
+                        </button>
+                    </div>
+                    <button onclick="changeMonth(1)" class="p-2 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform">
+                        <i class="ph ph-caret-right text-gray-400"></i>
+                    </button>
+                </div>
+            </header>
+
+            <section id="currencyDashboard" class="flex overflow-x-auto gap-4 pb-4 mb-4 no-scrollbar scroll-smooth snap-x">
+            </section>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <div class="flex items-center gap-2">
+                                <i class="ph ph-chart-pie-slice text-indigo-500 text-xl"></i>
+                                <h2 class="text-sm font-bold text-gray-800">類別分佈分析</h2>
+                            </div>
+                        </div>
+                        
+                        <div id="analyticsContent" class="flex flex-col items-center">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between sticky top-0 bg-[#f8fafc]/90 backdrop-blur-md py-2 z-10">
+                        <div class="flex items-center gap-2">
+                            <i class="ph ph-clock-counter-clockwise text-indigo-500 text-xl"></i>
+                            <h2 class="text-sm font-bold text-gray-800 tracking-tight">歷史明細紀錄</h2>
+                        </div>
+                        <div class="flex bg-gray-200 p-1 rounded-xl shadow-inner">
+                            <button onclick="setFilterType('expense')" id="filterExp" class="px-4 py-1 text-xs font-bold rounded-lg transition-all bg-white text-indigo-600 shadow-sm">支出</button>
+                            <button onclick="setFilterType('income')" id="filterInc" class="px-4 py-1 text-xs font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">收入</button>
+                        </div>
+                    </div>
+                    
+                    <div id="historyList" class="space-y-4 pb-6">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <button onclick="openAddModal()" class="fixed bottom-6 right-6 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-transform z-40 focus:outline-none">
+        <i class="ph ph-plus text-2xl"></i>
+    </button>
+
+    <div id="addRecordModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300" id="addRecordContent">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800" id="modalTitle">新增紀錄</h3>
+                    <button onclick="closeAddModal()" class="p-2 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 active:scale-95 transition-all focus:outline-none">
+                        <i class="ph ph-x text-lg"></i>
+                    </button>
+                </div>
+                
+                <div class="flex bg-gray-100 p-1 rounded-xl mb-5">
+                    <button type="button" onclick="setRecordType('expense')" id="btnTypeExp" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-white text-red-500 shadow-sm">支出</button>
+                    <button type="button" onclick="setRecordType('income')" id="btnTypeInc" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-green-500">收入</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <input type="date" id="input-date" onchange="onRecordDateChange()" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-medium text-gray-700">
+                    </div>
+                    <div class="space-y-2 bg-emerald-50/40 border border-emerald-100 rounded-xl p-3" id="account-select-group">
+                        <div class="flex items-center gap-2">
+                            <span class="w-14 text-xs font-bold text-emerald-700">誰付錢：</span>
+                            <select id="input-payer" class="flex-1 border-emerald-200 rounded-lg p-2 bg-white border focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm font-bold text-emerald-900 shadow-sm">
+                                <option value="公費">💰 公費 (不代墊)</option>
+                                <option value="爸爸">👨 爸爸</option>
+                                <option value="媽媽">👩 媽媽</option>
+                                <option value="女兒">👧 女兒</option>
+                            </select>
+                        </div>
+                        <div class="flex items-start gap-2 pt-1">
+                            <span class="w-14 text-xs font-bold text-emerald-700 mt-2">分攤給：</span>
+                            <div id="input-participants" class="flex-1 flex flex-wrap gap-2">
+                                <label class="flex items-center gap-1.5 bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm cursor-pointer hover:bg-emerald-50 transition-colors">
+                                    <input type="checkbox" value="爸爸" checked class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"><span class="text-xs font-bold text-gray-700">爸爸</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm cursor-pointer hover:bg-emerald-50 transition-colors">
+                                    <input type="checkbox" value="媽媽" checked class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"><span class="text-xs font-bold text-gray-700">媽媽</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm cursor-pointer hover:bg-emerald-50 transition-colors">
+                                    <input type="checkbox" value="女兒" checked class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"><span class="text-xs font-bold text-gray-700">女兒</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="input-category-main" onchange="updateSubCategories()" class="w-1/2 border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-gray-800"></select>
+                        <select id="input-category-sub" class="w-1/2 border-gray-200 rounded-xl p-3 bg-indigo-50/50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-indigo-700"></select>
+                    </div>
+                    <div>
+                        <input type="text" id="input-note" placeholder="輸入備註 (選填)" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm text-gray-700">
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="input-currency" class="w-1/3 border-gray-200 rounded-xl p-3 bg-indigo-50/50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-indigo-700">
+                            <option value="TWD">TWD</option><option value="JPY">JPY</option><option value="USD">USD</option><option value="EUR">EUR</option>
+                        </select>
+                        <input type="number" id="input-amount" placeholder="0" class="w-2/3 border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xl font-bold text-gray-800 tracking-wider">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex gap-3">
+                    <button id="btn-delete" onclick="executeDelete()" class="hidden w-1/3 bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 rounded-xl transition duration-200 active:scale-95 focus:outline-none">
+                        刪除
+                    </button>
+                    <button id="btn-save" onclick="saveRecord()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition duration-200 shadow-md shadow-indigo-200 active:scale-95 flex justify-center items-center gap-2 focus:outline-none">
+                        儲存 (僅存本機)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="settlementModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300 flex flex-col max-h-[90vh]" id="settlementContent">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+                <h3 id="settlementTitle" class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-calculator text-indigo-600 text-xl"></i> 旅程結算報告</h3>
+                <div class="flex gap-2">
+                    <button onclick="shareSettlement()" class="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 active:scale-95 transition-all focus:outline-none" title="一鍵推播報表">
+                        <i class="ph ph-share-network text-lg"></i>
+                    </button>
+                    <button onclick="closeSettlement()" class="p-2 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 active:scale-95 transition-all focus:outline-none">
+                        <i class="ph ph-x text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 space-y-4" id="settlement-results">
+                </div>
+            <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
+                自動彙整所有代墊與分攤金額
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300 flex flex-col max-h-[90vh]" id="settingsContent">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-gear-six text-indigo-600 text-xl"></i> 系統設定</h3>
+                <button onclick="closeSettings()" class="p-2 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 active:scale-95 transition-all focus:outline-none">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                <div class="bg-emerald-50/50 rounded-2xl border border-emerald-100 p-4" id="setting-block-trip">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-emerald-900 text-sm flex items-center gap-2"><i class="ph ph-airplane-tilt text-emerald-500 text-lg"></i> 旅程專案設定 (Trip ID)</h4>
+                    </div>
+                    <div class="space-y-3">
+                        <p class="text-[10px] text-emerald-700 leading-tight">切換代碼即可自動重置畫面並同步對應的雲端帳本。</p>
+                        <input type="text" id="cfg-trip-id" placeholder="例如：Fukuoka_2026" class="w-full border-emerald-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none font-bold text-gray-800 tracking-wider">
+                        <button onclick="saveTripId()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg active:scale-95 transition text-sm shadow-sm shadow-emerald-200 focus:outline-none flex justify-center items-center gap-2">
+                            <i class="ph ph-arrows-clockwise"></i> 切換 / 建立旅程
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 rounded-2xl border border-blue-100 p-4" id="setting-block-identity">
+                    <h4 class="font-bold text-blue-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-identification-card text-blue-500 text-lg"></i> 本機身分綁定 (Identity Binding)</h4>
+                    <div class="space-y-3">
+                        <p class="text-[10px] text-blue-700 leading-tight">綁定後，新增帳目將自動預設您為付款人，並作為權限驗證憑證。</p>
+                        <select id="cfg-my-identity" onchange="saveIdentity()" class="w-full border-blue-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none font-bold text-gray-800 shadow-sm">
+                            <option value="">-- 請選擇您的身分 --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-rose-50 rounded-2xl border border-rose-100 p-4" id="setting-block-members">
+                    <h4 class="font-bold text-rose-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-users-three text-rose-500 text-lg"></i> 旅程成員管理</h4>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" id="input-new-member" placeholder="新成員姓名" class="flex-1 border-rose-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-rose-400 focus:outline-none shadow-sm">
+                        <button onclick="addNewMember()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 rounded-lg active:scale-95 transition text-xs shadow-sm shadow-rose-200 focus:outline-none">加入</button>
+                    </div>
+                    <div id="settings-member-list" class="space-y-2">
+                        </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-4" id="setting-block-json">
+                    <h4 class="font-bold text-gray-700 text-sm flex items-center gap-2 mb-3"><i class="ph ph-hard-drives text-gray-500 text-lg"></i> 本機手動 JSON</h4>
+                    <div class="flex gap-2">
+                        <button onclick="exportData()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs flex justify-center items-center gap-1 focus:outline-none">
+                            <i class="ph ph-export"></i> 匯出備份
+                        </button>
+                        <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)">
+                        <button onclick="document.getElementById('import-file').click()" class="flex-1 bg-white hover:bg-gray-100 text-gray-700 font-bold border border-gray-200 py-2 rounded-lg active:scale-95 transition text-xs flex justify-center items-center gap-1 focus:outline-none">
+                            <i class="ph ph-download-simple"></i> 匯入還原
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-4" id="setting-block-security">
+                    <h4 class="font-bold text-indigo-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-shield-check text-indigo-500 text-lg"></i> 安全鎖定設定</h4>
+                    <div class="space-y-3">
+                        <div class="flex gap-2">
+                            <input type="password" id="input-new-pass-admin" maxlength="6" placeholder="新 6 位數管理者密碼" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
+                            <button onclick="changeAppPassword('admin')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
+                                修改主管
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="password" id="input-new-pass-guest" maxlength="6" placeholder="新 6 位數訪客密碼" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
+                            <button onclick="changeAppPassword('guest')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
+                                修改訪客
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-gray-400 leading-tight">下次開啟 APP 或從後台切換回前台時生效。</p>
+                    </div>
+                </div>
+            
+                <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
+            </div>
+            <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
+                System Version: v0.0.0.0 多人旅遊分帳
+            </div>
+        </div>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }
+
+        let records = []; 
+        let currentViewDate = new Date(); 
+        let currentCurrency = 'TWD'; 
+        let filterType = 'expense'; 
+        let editingRecordId = null;
+        let currentModalRecordType = 'expense';
+        let hasUnsyncedChanges = false; // ✨ [新增] 離線變更防丟失旗標 ✨
+        
+        // --- 密碼變數 ---
+        let appPass = localStorage.getItem('appPass') || "000000"; // 初始管理者密碼 000000
+        let guestPass = localStorage.getItem('guestPass') || "111111"; // ✨ [新增] 初始訪客密碼 111111 ✨
+        let currentUserRole = 'admin'; // ✨ [新增] 記錄當前登入身分 ✨
+        let currentInput = "";
+        
+        // ✨ [修改] 替換為旅程代碼與 GAS API 網址 ✨
+        let currentTripId = localStorage.getItem('tripSplit_tripId') || "";
+        let myIdentity = localStorage.getItem('tripSplit_myIdentity') || ""; // ✨ [新增] 身分綁定變數 ✨
+        const gasApiUrl = "https://script.google.com/macros/s/AKfycbzFzKfgIEWxZvcgvPZt-IkNsbd98eyPvwCgpQL4KVDj_IrCSVACq6wvAZDm-aR93vg/exec";
+        
+        
+        // ✨ [新增] 動態旅遊成員名單與 UI 渲染函數 ✨
+        let members = ["爸爸", "媽媽", "女兒"]; // 預設名單，未來會透過 API 從雲端試算表的 Members 分頁動態同步下載
+        window.currentPublicPayers = []; // ✨ [新增] 儲存從雲端同步下載的有交公費人員名單 ✨
+        window.memberDetailsList = []; // ✨ [新增] 儲存從雲端同步下載的成員加入日期明細表 ✨
+
+        // ✨ [修改] 支援帶入歷史人員，防止編輯舊紀錄時人員名單遺失 ✨
+        function renderMemberSelectors(historicalPayer = null, historicalParts = []) {
+            const payerSel = document.getElementById('input-payer');
+            const partContainer = document.getElementById('input-participants');
+            if (!payerSel || !partContainer) return;
+            
+            // 聯集目前的活躍成員與該筆紀錄的歷史成員，確保已離隊的舊成員也會顯示在選單中
+            let combinedMembers = [...new Set([...members, historicalPayer, ...historicalParts].filter(Boolean))];
+            combinedMembers = combinedMembers.filter(m => m !== '公費' && m !== '系統入帳');
+
+            // (1) 動態刷新「誰付錢」下拉選單
+            let payerHtml = '<option value="公費">💰 公費 (不代墊)</option>';
+            combinedMembers.forEach(m => {
+                payerHtml += `<option value="${m}">${m}</option>`;
+            });
+            payerSel.innerHTML = payerHtml;
+            
+            // (2) 動態刷新「分攤給」勾選清單
+            let partHtml = '';
+            const currentRecordDate = document.getElementById('input-date').value;
+
+            combinedMembers.forEach(m => {
+                // 檢查該成員在當前消費日期是否已經加入旅程
+                const memberInfo = (window.memberDetailsList || []).find(info => info.name === m);
+                let isJoined = true;
+                if (memberInfo && memberInfo.join_date && currentRecordDate) {
+                    // 若消費日期早於該成員的加入日期，標記為尚未加入
+                    if (currentRecordDate < memberInfo.join_date) {
+                        isJoined = false;
+                    }
+                }
+
+                // 預設打勾邏輯：若是編輯紀錄則依據歷史名單決定；若是新增紀錄，已加入者全勾，未加入者不勾
+                const isChecked = historicalParts.length > 0 ? historicalParts.includes(m) : isJoined;
+                
+                if (isJoined) {
+                    // 已加入成員：正常顯示與勾選
+                    partHtml += `
+                    <label class="flex items-center gap-1.5 bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm cursor-pointer hover:bg-emerald-50 transition-colors">
+                        <input type="checkbox" value="${m}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"><span class="text-xs font-bold text-gray-700">${m}</span>
+                    </label>`;
+                } else {
+                    // 未加入成員防呆：鎖定並加上特殊樣式，防止人為誤勾導致算錯
+                    partHtml += `
+                    <label class="flex items-center gap-1.5 bg-gray-100 border border-gray-200 px-2 py-1.5 rounded-lg shadow-sm opacity-40 cursor-not-allowed" title="此時該成員尚未加入旅程">
+                        <input type="checkbox" value="${m}" disabled class="w-4 h-4 text-gray-400 rounded cursor-not-allowed"><span class="text-xs font-bold text-gray-400 line-through">${m} (未加入)</span>
+                    </label>`;
+                }
+            });
+            partContainer.innerHTML = partHtml;
+        }
+
+        // ✨ [修改] 將記帳類別更改為「旅遊專屬」項目 ✨
+        const categoryMap = {
+            'expense': { '餐飲': ['正餐', '小吃/點心', '酒水/咖啡', '超市/超商'], '交通': ['機票', '火車/高鐵', '公車/地鐵', '計程車', '租車/油錢'], '住宿': ['飯店/旅館', '民宿', '城市稅/其他'], '育樂': ['門票', '體驗活動', '導覽'], '購物': ['伴手禮', '藥妝', '服飾', '免稅品', '個人代購'], '其他': ['網路/SIM卡', '保險', '手續費', '雜支'] },
+            'income': { '公費': ['預收公費', '補繳公費'], '退款': ['退稅', '訂單退款', '其他退款'] }
+        };
+
+        // ✨ [新增] 付款方式對應表 ✨
+        const accountMap = {
+            '現金': [],
+            '信用卡': ['中信卡', '玉山卡']
+        };
+
+        function getAmountColor(amount, type) {
+            if (type === 'income') return 'text-green-600 font-bold'; 
+            if (amount < 1000) return 'text-orange-500 font-medium'; 
+            if (amount < 3000) return 'text-rose-500 font-bold';    
+            if (amount < 5000) return 'text-red-500 font-black';    
+            if (amount < 10000) return 'text-pink-700 font-black';  
+            return 'text-red-700 font-black underline decoration-2'; 
+        }
+
+        // ✨ [新增] 控制付款子選單的函數 ✨
+        function updateSubAccounts(def = null) {
+            const mainAcc = document.getElementById('input-account-main').value;
+            const subSel = document.getElementById('input-account-sub');
+            const subs = accountMap[mainAcc] || [];
+            if(subs.length > 0) {
+                subSel.classList.remove('hidden');
+                subSel.innerHTML = subs.map(s => `<option value="${s}">${s}</option>`).join('');
+                if(def && subs.includes(def)) subSel.value = def;
+            } else {
+                subSel.classList.add('hidden'); subSel.innerHTML = '';
+            }
+        }
+
+        const defaultCurrencyList = ['TWD', 'JPY', 'USD', 'EUR'];
+
+        function getLocalYMD(d) { const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
+        function utf8_to_b64(str) { return window.btoa(unescape(encodeURIComponent(str))); }
+        function b64_to_utf8(str) { return decodeURIComponent(escape(window.atob(str))); }
+        function showLoading(t) { document.getElementById('loading-text').innerText = t; document.getElementById('loading-overlay').classList.replace('hidden', 'flex'); }
+        function hideLoading() { document.getElementById('loading-overlay').classList.replace('flex', 'hidden'); }
+        function showSettingsMsg(msg, isSuccess = true) { const d = document.getElementById('settings-msg'); d.innerText = msg; d.className = `text-center text-xs font-bold transition-opacity duration-300 h-4 ${isSuccess ? 'text-green-600' : 'text-red-600'}`; d.style.opacity = '1'; setTimeout(() => { d.style.opacity = '0'; }, 3000); }
+
+        // ✨ 強化版雲端狀態燈號 ✨
+        function updateCloudIcon(state) {
+            const icon = document.getElementById('cloud-status-icon');
+            if (state === 'success') { 
+                icon.innerHTML = '<i class="ph ph-cloud-check text-2xl"></i>'; 
+                icon.className = 'text-green-500 transition-colors p-1.5 rounded-full hover:bg-green-50 focus:outline-none'; 
+                icon.title = "已與雲端同步"; 
+            } else if (state === 'unsynced') {
+                // 橘燈提示：有尚未上傳的本地變更
+                icon.innerHTML = '<i class="ph ph-cloud-arrow-up text-2xl"></i>'; 
+                icon.className = 'text-orange-500 transition-colors p-1.5 rounded-full hover:bg-orange-50 focus:outline-none animate-pulse'; 
+                icon.title = "有未上傳的變更，請點擊上傳！"; 
+            } else { 
+                icon.innerHTML = '<i class="ph ph-cloud-warning text-2xl"></i>'; 
+                icon.className = 'text-red-400 transition-colors p-1.5 rounded-full hover:bg-red-50 focus:outline-none'; 
+                icon.title = "同步失敗 / 尚未設定金鑰"; 
+            }
+        }
+
+        async function init() {
+            // 開啟時重設輸入狀態
+            clearPass();
+            
+            // ✨ [修改] 替換為載入新的旅程代碼設定 ✨
+            loadTripConfig();
+            
+            const saved = localStorage.getItem('expenseRecords');
+            if (saved) { 
+                records = JSON.parse(saved); 
+                records.forEach(r => { 
+                    if(!r.currency) r.currency = 'TWD'; 
+                    if(!r.type) r.type = 'expense'; 
+                }); 
+            }
+            
+            const used = [...new Set(records.map(r => r.currency))];
+            if(used.length > 0 && !used.includes(currentCurrency)) currentCurrency = used[0];
+
+            // 確保資料載入後，正確渲染當前月份 (5月) 與畫面
+            renderAll();
+            
+            // ✨ [修正] APP 啟動時檢查並同步；輪詢計時器必須獨立註冊，避免首次登入的用戶錯失背景同步機制 ✨
+            if (currentTripId) {
+                forceSyncDownload();
+            }
+            setInterval(() => {
+                if (currentTripId) forceSyncDownload();
+            }, 120000);
+        }
+
+        function renderAll() {
+            renderHeader();
+            renderCurrencyDashboard();
+            renderAnalytics();
+            renderHistory();
+        }
+
+        function renderHeader() {
+            const y = currentViewDate.getFullYear();
+            const m = currentViewDate.getMonth() + 1;
+            document.getElementById('currentYearDisplay').innerText = y;
+            document.getElementById('currentMonthDisplay').innerText = `${m}月`;
+            
+            const today = new Date();
+            const btn = document.getElementById('backTodayBtn');
+            if(y === today.getFullYear() && m === today.getMonth() + 1) btn.classList.add('hidden');
+            else btn.classList.remove('hidden');
+        }
+
+        function changeMonth(delta) { currentViewDate.setMonth(currentViewDate.getMonth() + delta); renderAll(); }
+        function resetToToday() { currentViewDate = new Date(); renderAll(); }
+
+        function renderCurrencyDashboard() {
+            const dash = document.getElementById('currencyDashboard');
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            const prefix = `${y}-${m}`;
+            const monthRecords = records.filter(r => r.date.startsWith(prefix));
+            
+            let usedCurrencies = [...new Set(monthRecords.map(r => r.currency))];
+            if(usedCurrencies.length === 0) usedCurrencies = ['TWD'];
+            if(!usedCurrencies.includes(currentCurrency)) currentCurrency = usedCurrencies[0];
+
+            let html = '';
+            usedCurrencies.forEach(curr => {
+                const cRecs = monthRecords.filter(r => r.currency === curr);
+                const inc = cRecs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+                const exp = cRecs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+                const net = inc - exp;
+                const isActive = curr === currentCurrency;
+                
+                const baseClass = "min-w-[240px] snap-center p-5 rounded-[24px] cursor-pointer transition-all duration-300 border shadow-sm ";
+                const stateClass = isActive ? "bg-indigo-600 text-white border-indigo-500 scale-100" : "bg-white text-gray-800 border-gray-100 scale-95 opacity-70 hover:opacity-100 hover:scale-[0.98]";
+                
+                html += `
+                <div onclick="selectCurrency('${curr}')" class="${baseClass} ${stateClass}">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xs font-black tracking-widest ${isActive ? 'text-indigo-200' : 'text-gray-400'}">${curr}</span>
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center ${isActive ? 'bg-white/20' : 'bg-gray-100'}">
+                            <i class="ph ph-coins text-lg ${isActive ? 'text-white' : 'text-gray-500'}"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium mb-1 opacity-80">本月結餘</p>
+                        <h3 class="text-3xl font-black tracking-tight">${net.toLocaleString()}</h3>
+                    </div>
+                    <div class="flex items-center gap-4 mt-4 pt-4 border-t ${isActive ? 'border-indigo-500/50' : 'border-gray-100'}">
+                        <div class="flex-1">
+                            <p class="text-[10px] uppercase font-bold opacity-60 flex items-center gap-1"><i class="ph ph-arrow-down-left"></i>收入</p>
+                            <p class="text-sm font-bold mt-0.5">${inc.toLocaleString()}</p>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-[10px] uppercase font-bold opacity-60 flex items-center gap-1"><i class="ph ph-arrow-up-right"></i>支出</p>
+                            <p class="text-sm font-bold mt-0.5">${exp.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            dash.innerHTML = html;
+        }
+
+        function selectCurrency(curr) { currentCurrency = curr; renderAll(); }
+
+        function setFilterType(type) {
+            filterType = type;
+            const expBtn = document.getElementById('filterExp'), incBtn = document.getElementById('filterInc');
+            if(type === 'expense') {
+                expBtn.className = "px-4 py-1 text-xs font-bold rounded-lg transition-all bg-white text-indigo-600 shadow-sm";
+                incBtn.className = "px-4 py-1 text-xs font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+            } else {
+                incBtn.className = "px-4 py-1 text-xs font-bold rounded-lg transition-all bg-white text-indigo-600 shadow-sm";
+                expBtn.className = "px-4 py-1 text-xs font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+            }
+            renderAnalytics();
+            renderHistory();
+        }
+
+        function renderAnalytics() {
+            const container = document.getElementById('analyticsContent');
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.currency === currentCurrency && r.type === filterType);
+            const total = targetRecords.reduce((s, r) => s + r.amount, 0);
+
+            if(total === 0) { container.innerHTML = `<div class="py-10 text-center text-gray-400 font-bold text-sm">本月無${filterType === 'expense'?'支出':'收入'}資料</div>`; return; }
+
+            const catData = {}; 
+            targetRecords.forEach(r => {
+                const parts = r.category.split('-');
+                const main = parts[0];
+                const sub = parts[1] || '其他';
+                if(!catData[main]) catData[main] = { total: 0, subs: {} };
+                catData[main].total += r.amount;
+                catData[main].subs[sub] = (catData[main].subs[sub] || 0) + r.amount;
+            });
+
+            const sortedMains = Object.keys(catData).sort((a, b) => catData[b].total - catData[a].total);
+            const colors = ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#14b8a6', '#22c55e', '#06b6d4'];
+            let conicStops = [], currentDeg = 0, listHtml = '<div class="w-full mt-8 space-y-6">';
+
+            sortedMains.forEach((main, index) => {
+                const data = catData[main];
+                const pct = (data.total / total) * 100;
+                const deg = (pct / 100) * 360;
+                const color = colors[index % colors.length];
+                conicStops.push(`${color} ${currentDeg}deg ${currentDeg + deg}deg`); 
+                currentDeg += deg;
+
+                listHtml += `
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between group">
+                        <div class="flex items-center gap-3">
+                            <span class="w-3 h-3 rounded-full shadow-sm" style="background-color: ${color}"></span>
+                            <div><p class="text-sm font-black text-gray-800">${main}</p><p class="text-[10px] font-bold text-gray-400">${pct.toFixed(1)}%</p></div>
+                        </div>
+                        <span class="text-sm ${getAmountColor(data.total, filterType)}">${data.total.toLocaleString()}</span>
+                    </div>
+                    <div class="ml-6 space-y-1.5 border-l-2 border-gray-100 pl-3">
+                `;
+                const sortedSubs = Object.keys(data.subs).sort((a,b) => data.subs[b] - data.subs[a]);
+                sortedSubs.forEach(sub => {
+                    const subAmt = data.subs[sub];
+                    listHtml += `<div class="flex justify-between items-center text-[11px] font-medium"><span class="flex items-center gap-1.5 text-gray-500"><span class="w-1 h-1 rounded-full bg-gray-300"></span>${sub}</span><span class="${getAmountColor(subAmt, filterType)}">${subAmt.toLocaleString()}</span></div>`;
+                });
+                listHtml += `</div></div>`;
+            });
+            listHtml += '</div>';
+            container.innerHTML = `<div class="relative flex justify-center items-center"><div class="donut-chart shadow-sm" style="background: conic-gradient(${conicStops.join(', ')})"></div><div class="absolute flex flex-col items-center pointer-events-none"><span class="text-[10px] font-bold text-gray-400 uppercase">總計</span><span class="text-sm font-black text-indigo-900">${total.toLocaleString()}</span></div></div>${listHtml}`;
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.currency === currentCurrency && r.type === filterType);
+            
+            if(targetRecords.length === 0) { list.innerHTML = `<div class="bg-white rounded-2xl p-8 text-center text-gray-400 font-bold text-sm border border-gray-100 shadow-sm">尚無資料</div>`; return; }
+
+            const grouped = {};
+            targetRecords.forEach(r => { if(!grouped[r.date]) grouped[r.date] = []; grouped[r.date].push(r); });
+            const sortedDates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+            
+            let html = '';
+            sortedDates.forEach(date => {
+                const dayStr = date.substring(8, 10);
+                const wd = ['日','一','二','三','四','五','六'][new Date(date).getDay()];
+                
+                html += `<div class="mb-6"><div class="flex items-end gap-2 mb-3 px-1"><span class="text-lg font-black text-gray-800">${dayStr}</span><span class="text-xs font-bold text-gray-400 mb-1">週${wd}</span></div><div class="bg-white rounded-[20px] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">`;
+                
+                grouped[date].forEach(r => {
+                    const iconColor = r.type === 'expense' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500';
+                    const iconPh = r.type === 'expense' ? 'ph-trend-down' : 'ph-trend-up';
+                    
+                    // ✨ [修改] 旅遊分帳專屬：顯示付款人與分攤對象 ✨
+                    let accBadge = '';
+                    if (r.type === 'expense') {
+                        // 處理付款人標籤
+                        let payerText = r.payer || '公費';
+                        let payerColor = payerText === '公費' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                        accBadge = `<span class="inline-block ${payerColor} border px-1.5 py-0.5 rounded text-[9px] font-bold ml-2 shadow-sm">付: ${payerText}</span>`;
+                        
+                        // 處理分攤對象標籤
+                        if (r.participants) {
+                            let partsArray = r.participants.split(',');
+                            let partsText = partsArray.length >= 3 ? '全體' : partsArray.join(',');
+                            accBadge += `<span class="inline-block bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 shadow-sm">分: ${partsText}</span>`;
+                        }
+                    }
+
+                    html += `
+                    <div onclick="editRecord('${r.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${iconColor} group-active:scale-90 transition-transform">
+                                <i class="ph ${iconPh} text-lg"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-gray-800 mb-0.5 flex items-center">${r.category} ${accBadge}</p>
+                                <p class="text-xs font-medium text-gray-400 truncate max-w-[150px]">${r.note}</p>
+                            </div>
+                        </div>
+                        <span class="text-base ${getAmountColor(r.amount, r.type)}">${r.amount.toLocaleString()}</span>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            });
+            list.innerHTML = html;
+        }
+
+        function openAddModal() {
+            editingRecordId = null;
+            document.getElementById('modalTitle').innerText = '新增紀錄';
+            document.getElementById('btn-delete').classList.add('hidden');
+            
+            document.getElementById('input-date').value = getLocalYMD(new Date());
+            document.getElementById('input-amount').value = '';
+            document.getElementById('input-note').value = '';
+            document.getElementById('input-currency').value = currentCurrency;
+            setRecordType(filterType); 
+            
+            // ✨ [新增] 每次開啟表單時，自動依據變數刷新成員名單 UI ✨
+            renderMemberSelectors();
+            
+            // ✨ [新增] 自動預設付款人為本機綁定身分 ✨
+            if (myIdentity && currentModalRecordType === 'expense') {
+                const payerSel = document.getElementById('input-payer');
+                if (payerSel && Array.from(payerSel.options).some(opt => opt.value === myIdentity)) {
+                    payerSel.value = myIdentity;
+                }
+            }
+            
+            const m = document.getElementById('addRecordModal'), c = document.getElementById('addRecordContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('translate-y-full'); });
+        }
+
+        function editRecord(id) {
+            // ✨ [修正] 雙重保險：編輯時也強制轉為字串進行精確比對 ✨
+            editingRecordId = String(id);
+            const r = records.find(x => String(x.id) === String(id));
+            if(!r) return;
+            
+            document.getElementById('modalTitle').innerText = '編輯紀錄';
+            document.getElementById('btn-delete').classList.remove('hidden');
+            
+            document.getElementById('input-date').value = r.date;
+            document.getElementById('input-note').value = r.note === '無備註' ? '' : r.note;
+            document.getElementById('input-amount').value = r.amount;
+            document.getElementById('input-currency').value = r.currency;
+            setRecordType(r.type || 'expense');
+            
+            // ✨ [修改] 載入旅遊分帳的付款人與分攤對象 (支援歷史人員防呆) ✨
+            let historicalParts = [];
+            if(r.participants) historicalParts = r.participants.split(',');
+            renderMemberSelectors(r.payer, historicalParts); // 傳入歷史名單重新生成完美對應的 UI
+            
+            if(r.type === 'expense') {
+                const payerSel = document.getElementById('input-payer');
+                if(payerSel) payerSel.value = r.payer || '公費';
+                
+                // (勾選邏輯已經在 renderMemberSelectors 中自動處理完畢，此處不需再跑 foreach)
+            }
+
+            const mCat = r.category.includes('-') ? r.category.split('-')[0] : r.category;
+            const sCat = r.category.includes('-') ? r.category.split('-')[1] : null;
+            document.getElementById('input-category-main').value = mCat;
+            updateSubCategories(sCat);
+            
+            const m = document.getElementById('addRecordModal'), c = document.getElementById('addRecordContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('translate-y-full'); });
+        }
+
+        function closeAddModal() {
+            const m = document.getElementById('addRecordModal'), c = document.getElementById('addRecordContent');
+            m.classList.add('opacity-0'); c.classList.add('translate-y-full');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+
+        // ✨ [新增] 消費日期變更時，即時動態連動防呆過濾分攤名單 ✨
+        function onRecordDateChange() {
+            // 取得當前表單內是否含有歷史勾選紀錄，進行無縫防呆重繪
+            const checkedBoxes = document.querySelectorAll('#input-participants input[type="checkbox"]:checked');
+            const currentParts = Array.from(checkedBoxes).map(cb => cb.value);
+            const currentPayer = document.getElementById('input-payer').value;
+            renderMemberSelectors(currentPayer, currentParts);
+        }
+
+        function setRecordType(type) {
+            currentModalRecordType = type;
+            const eBtn = document.getElementById('btnTypeExp'), iBtn = document.getElementById('btnTypeInc');
+            const accGroup = document.getElementById('account-select-group'); // 新增這行
+            
+            if(type === 'expense') {
+                eBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-white text-red-500 shadow-sm";
+                iBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-green-500";
+                accGroup.classList.remove('hidden'); // 支出顯示帳戶
+            } else {
+                iBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-white text-green-500 shadow-sm";
+                eBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-red-500";
+                accGroup.classList.add('hidden'); // 收入隱藏帳戶
+            }
+            
+            const mainSel = document.getElementById('input-category-main');
+            const cats = Object.keys(categoryMap[type]);
+            mainSel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            updateSubCategories();
+        }
+
+        function updateSubCategories(def = null) {
+            const mainCat = document.getElementById('input-category-main').value;
+            const subSel = document.getElementById('input-category-sub');
+            const subs = categoryMap[currentModalRecordType][mainCat] || [];
+            if(subs.length > 0) {
+                subSel.classList.remove('hidden');
+                subSel.innerHTML = subs.map(s => `<option value="${s}">${s}</option>`).join('');
+                if(def && subs.includes(def)) subSel.value = def;
+            } else {
+                subSel.classList.add('hidden'); subSel.innerHTML = '';
+            }
+        }
+
+        // ✨ [修改] 升級為非同步函數，並將資料發送至 Google Sheets ✨
+        async function saveRecord() {
+            if (!currentTripId) { alert("請先到設定面板設定【旅程專案設定 (Trip ID)】！"); return; }
+            
+            const d = document.getElementById('input-date').value, n = document.getElementById('input-note').value, a = document.getElementById('input-amount').value, curr = document.getElementById('input-currency').value;
+            const mCat = document.getElementById('input-category-main').value, sSel = document.getElementById('input-category-sub');
+            let cat = mCat; if(!sSel.classList.contains('hidden') && sSel.value) cat = `${mCat}-${sSel.value}`;
+            
+            // ✨ [新增] 讀取付款人與分攤對象 ✨
+            let payer = '系統入帳';
+            let participantsStr = '';
+            
+            if (currentModalRecordType === 'expense') {
+                const payerSel = document.getElementById('input-payer');
+                payer = payerSel ? payerSel.value : '公費';
+                
+                const checkedBoxes = document.querySelectorAll('#input-participants input[type="checkbox"]:checked');
+                const parts = Array.from(checkedBoxes).map(cb => cb.value);
+                if (parts.length === 0) { alert("請至少選擇一位分攤對象"); return; }
+                participantsStr = parts.join(','); // 將陣列轉為逗號分隔字串
+            }
+
+            if (!d || !a || parseFloat(a) <= 0) { alert("請輸入正確金額與日期"); return; }
+
+            const recordId = editingRecordId || Date.now().toString();
+            const newRecord = { 
+                id: recordId, 
+                trip_id: currentTripId, 
+                type: currentModalRecordType, 
+                payer: payer, 
+                participants: participantsStr,
+                date: d, 
+                category: cat, 
+                note: n || "無備註", 
+                total_amount: parseFloat(a), 
+                amount: parseFloat(a), 
+                currency: curr 
+            };
+
+            if(editingRecordId) {
+                const idx = records.findIndex(r => r.id === editingRecordId);
+                if(idx !== -1) records[idx] = newRecord;
+            } else {
+                records.push(newRecord);
+            }
+            
+            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            closeAddModal();
+            renderAll();
+       
+            updateCloudIcon('unsynced');
+            
+            // ✨ [新增] 透過 fetch API 在背景將 JSON 傳送至 Google API ✨
+            try {
+                // 加上 action: 'save' 標記
+                const payload = { ...newRecord, action: 'save' };
+                const res = await fetch(gasApiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if(result.status === 'success') {
+                    updateCloudIcon('success'); // 寫入成功，亮綠燈
+                    hasUnsyncedChanges = false;
+                } else {
+                    console.error("雲端寫入失敗:", result.message);
+                    hasUnsyncedChanges = true;
+                }
+            } catch(error) {
+                console.error("API 連線錯誤:", error);
+                hasUnsyncedChanges = true;
+            }
+        }
+
+        async function executeDelete() {
+            if(!editingRecordId) return;
+            const targetId = editingRecordId;
+            records = records.filter(r => r.id !== targetId);
+            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            closeAddModal(); 
+            renderAll(); 
+            
+            updateCloudIcon('unsynced');
+
+            // ✨ [新增] 發送刪除指令至 Google API 雲端 ✨
+            try {
+                const res = await fetch(gasApiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ id: targetId, action: 'delete' })
+                });
+                const result = await res.json();
+                if(result.status === 'success') {
+                    updateCloudIcon('success');
+                }
+            } catch(error) {
+                console.error("API 連線錯誤:", error);
+            }
+        }
+
+        // ================= 設定與雲端中控台 =================
+        function openSettings() {
+            loadTripConfig(); // ✨ [修改] 換成新的載入旅程代碼函數 ✨
+            renderSettingsMembers(); // ✨ [新增] 渲染成員管理清單 ✨
+            renderIdentitySelect(); // ✨ [新增] 渲染身分綁定選單 ✨
+            
+            // ✨ [新增] 雙重密碼權限管控機制 ✨
+            const isGuest = (currentUserRole === 'guest');
+            const isSetupComplete = (currentTripId !== "" && myIdentity !== "");
+            
+            // 若為訪客且已設定完畢，就徹底隱藏專案與身分欄位；成員與密碼設定則對訪客永遠隱藏
+            document.getElementById('setting-block-trip').style.display = (isGuest && isSetupComplete) ? 'none' : 'block';
+            document.getElementById('setting-block-identity').style.display = (isGuest && isSetupComplete) ? 'none' : 'block';
+            document.getElementById('setting-block-members').style.display = isGuest ? 'none' : 'block';
+            document.getElementById('setting-block-security').style.display = isGuest ? 'none' : 'block';
+            
+            const m = document.getElementById('settingsModal'), c = document.getElementById('settingsContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('translate-y-full'); });
+        }
+
+        // ✨ [新增] 動態渲染身分綁定選單 ✨
+        function renderIdentitySelect() {
+            const sel = document.getElementById('cfg-my-identity');
+            if (!sel) return;
+            let html = '<option value="">-- 請選擇您的身分 --</option>';
+            members.forEach(m => {
+                html += `<option value="${m}" ${myIdentity === m ? 'selected' : ''}>${m}</option>`;
+            });
+            sel.innerHTML = html;
+        }
+
+        // ✨ [新增] 儲存身分綁定 ✨
+        function saveIdentity() {
+            const sel = document.getElementById('cfg-my-identity');
+            myIdentity = sel.value;
+            localStorage.setItem('tripSplit_myIdentity', myIdentity);
+            showSettingsMsg("身分綁定成功！");
+        }
+
+        // ✨ [新增] 動態渲染活躍成員清單 ✨
+        function renderSettingsMembers() {
+            const list = document.getElementById('settings-member-list');
+            if (!list) return;
+            if (members.length === 0) {
+                list.innerHTML = '<p class="text-[10px] text-rose-700">目前無活躍成員可供結算。</p>';
+                return;
+            }
+            let html = '<p class="text-[10px] text-rose-700 leading-tight mb-3">點擊離隊後，系統將封存其歷史紀錄，不再參與未來的新增分攤。</p>';
+            members.forEach(m => {
+                html += `
+                <div class="flex justify-between items-center bg-white border border-rose-200 p-2 rounded-lg shadow-sm">
+                    <span class="text-sm font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-user text-rose-400"></i> ${m}</span>
+                    <button onclick="checkoutMember('${m}')" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold transition active:scale-95">結清離隊</button>
+                </div>`;
+            });
+            list.innerHTML = html;
+        }
+
+        // ✨ [新增] 新增成員並寫入雲端 ✨
+        async function addNewMember() {
+            const input = document.getElementById('input-new-member');
+            const newName = input.value.trim();
+            if (!newName) { showSettingsMsg("請輸入姓名", false); return; }
+            if (members.includes(newName)) { showSettingsMsg("成員已存在", false); return; }
+            if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
+
+            showSettingsMsg("正在新增成員...");
+            updateCloudIcon('unsynced');
+            
+            try {
+                const res = await fetch(gasApiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: 'add_member', 
+                        trip_id: currentTripId, 
+                        member_name: newName,
+                        join_date: getLocalYMD(new Date())
+                    })
+                });
+                const result = await res.json();
+                if(result.status === 'success') {
+                    input.value = '';
+                    showSettingsMsg(`${newName} 已成功加入！`);
+                    forceSyncDownload(); // 強制刷新下載新名單
+                } else {
+                    showSettingsMsg("處理失敗", false);
+                }
+            } catch(error) {
+                console.error("API 連線錯誤:", error);
+                showSettingsMsg("連線錯誤", false);
+            }
+        }
+
+        // ✨ [新增] 呼叫後端執行中途結算與封存 ✨
+        async function checkoutMember(memberName) {
+            if (!confirm(`確定要讓「${memberName}」提早結算並離隊嗎？\n請確認已將其當下的欠款或退款實體結清！\n(操作後無法於前端復原)`)) return;
+
+            showSettingsMsg(`正在封存 ${memberName} 的資料...`);
+            updateCloudIcon('unsynced');
+
+            try {
+                const res = await fetch(gasApiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'checkout_member', trip_id: currentTripId, member_name: memberName })
+                });
+                const result = await res.json();
+                if(result.status === 'success') {
+                    showSettingsMsg(`${memberName} 已成功離隊！`);
+                    forceSyncDownload(); // 離隊成功後強制重新下載最新帳本與名單
+                } else {
+                    showSettingsMsg("處理失敗：" + result.message, false);
+                }
+            } catch(error) {
+                console.error("API 連線錯誤:", error);
+                showSettingsMsg("連線錯誤", false);
+            }
+        }
+
+        function closeSettings() {
+            const m = document.getElementById('settingsModal'), c = document.getElementById('settingsContent');
+            m.classList.add('opacity-0'); c.classList.add('translate-y-full');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+
+        // ✨ [修改] 替換為旅程代碼管理與暫存的同步按鈕邏輯 ✨
+        function saveTripId() {
+            // ✨ [修正] 強制將輸入的代碼轉換為大寫，確保跨裝置輸入大小寫時皆視為相同專案 ✨
+            const newId = document.getElementById('cfg-trip-id').value.trim().toUpperCase();
+            if (!newId) { showSettingsMsg("請輸入旅程代碼", false); return; }
+            
+            // ✨ [新增] 智慧旅程切換：切換前先清理本地舊帳本與身分防呆 ✨
+            if (currentTripId !== newId) {
+                myIdentity = "";
+                localStorage.removeItem('tripSplit_myIdentity');
+            }
+            
+            currentTripId = newId;
+            localStorage.setItem('tripSplit_tripId', currentTripId);
+            records = []; // 切換專案時先清空畫面
+            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            showSettingsMsg("代碼切換中...");
+            renderAll();
+            renderIdentitySelect(); // 刷新選單
+            
+            // ✨ [新增] 切換代碼後，立刻觸發雲端下載 ✨
+            forceSyncDownload();
+        }
+
+        function loadTripConfig() {
+            if (currentTripId) {
+                document.getElementById('cfg-trip-id').value = currentTripId;
+            }
+        }
+
+        // ✨ [修改] 正式對接 Google Sheets 進行資料與名單下載 ✨
+        async function forceSyncDownload() {
+            if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
+            if (hasUnsyncedChanges) { 
+                showSettingsMsg("偵測到離線未同步資料，暫停背景下載以免覆蓋！", false); 
+                updateCloudIcon('unsynced');
+                return; 
+            }
+            showLoading("雲端同步中...");
+            try {
+                // 透過 GET 請求呼叫我們部署的 GAS API，並帶上 Trip ID (✨加入 encodeURIComponent 確保中文代碼傳輸安全✨)
+                const res = await fetch(`${gasApiUrl}?trip_id=${encodeURIComponent(currentTripId)}`);
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    // 1. 動態更新參與人員名單 (若雲端有資料)
+                    // ✨ [修正] 必須無條件覆蓋，避免切換全新專案時殘留上一個專案的人員名單 ✨
+                    members = data.members || [];
+                    
+                    // ✨ [補齊遺漏] 智慧旅程切換：若為全新專案 (雲端無成員)，觸發人數建置對話框 ✨
+                    if (members.length === 0 && currentTripId !== "") {
+                        setTimeout(() => {
+                            const firstMember = prompt(`偵測到全新旅程專案「${currentTripId}」！\n請輸入第一位初始成員（例如您的姓名）來建立此專案：`);
+                            if (firstMember && firstMember.trim() !== "") {
+                                const inputObj = document.getElementById('input-new-member');
+                                if(inputObj) inputObj.value = firstMember.trim();
+                                addNewMember(); // 自動呼叫既有的新增成員函數寫入雲端
+                            }
+                        }, 500);
+                    }
+                    
+                    // ✨ [新增] 同步更新有交公費的人員名冊 ✨
+                    window.currentPublicPayers = data.public_payers || [];
+                    
+                    // ✨ [新增] 同步儲存成員加入日期明細表 ✨
+                    window.memberDetailsList = data.member_details || [];
+                    
+                    // 2. 更新歷史帳務明細
+                    if (data.transactions) {
+                        records = data.transactions;
+                        // ✨ [修正] 將雲端下載的數值 ID 強制轉回字串，徹底解除編輯鎖死 Bug ✨
+                        records.forEach(r => r.id = String(r.id));
+                        localStorage.setItem('expenseRecords', JSON.stringify(records));
+                    }
+                    
+                    // ✨ [新增] 雲端強制銷毀 (Kill Switch) 驗證 ✨
+                    // 若本機有綁定身分，但該身分已不存在於雲端傳回的活躍名單中 (被設為 Left 或刪除)
+                    if (myIdentity && members.length > 0 && !members.includes(myIdentity)) {
+                        alert("⚠️ 系統警告：您的帳號已被標記為離隊或專案已結案。本地資料將立即銷毀並登出。");
+                        localStorage.removeItem('expenseRecords');
+                        localStorage.removeItem('tripSplit_tripId');
+                        localStorage.removeItem('tripSplit_myIdentity');
+                        location.reload(); // 強制重整自爆清空權限
+                        return;
+                    }
+                    
+                    updateCloudIcon('success');
+                    renderAll();
+                    showSettingsMsg("雲端資料同步成功！");
+                } else {
+                    showSettingsMsg("同步失敗：" + data.message, false);
+                    updateCloudIcon('error');
+                }
+            } catch (error) {
+                console.error(error);
+                showSettingsMsg("網路連線異常", false);
+                updateCloudIcon('error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // ✨ [修改] 提示目前採即時上傳制 ✨
+        async function forceSyncUpload() { 
+            if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
+            showSettingsMsg("目前採即時自動上傳，無需手動覆蓋");
+        }
+
+        function exportData() { if (records.length === 0) { showSettingsMsg("無資料可匯出", false); return; } try { const d = JSON.stringify(records), u = 'data:application/json;charset=utf-8,' + encodeURIComponent(d), l = document.createElement('a'); l.href = u; l.download = `記帳備份_${getLocalYMD(new Date())}.json`; document.body.appendChild(l); l.click(); document.body.removeChild(l); showSettingsMsg("JSON 匯出成功！"); } catch (e) { showSettingsMsg("匯出失敗", false); } }
+        
+        function importData(ev) { 
+            const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); 
+            r.onload = async function(e) { 
+                try { 
+                    const im = JSON.parse(e.target.result); 
+                    if (Array.isArray(im)) { 
+                        records = im; 
+                        records.forEach(r=>{if(!r.type)r.type='expense'; if(!r.currency)r.currency='TWD';}); 
+                        localStorage.setItem('expenseRecords', JSON.stringify(records)); 
+                        showSettingsMsg("還原成功！"); 
+                        renderAll(); 
+                        
+                        // ✨ 拔除匯入時的自動上傳，改為橘燈提示 ✨
+                        updateCloudIcon('unsynced');
+                    } else {
+                        showSettingsMsg("格式錯誤", false); 
+                    }
+                } catch(err) { showSettingsMsg("讀取失敗", false); } 
+                ev.target.value = ''; 
+            }; 
+            r.readAsText(f); 
+        }
+// --- 密碼鎖邏輯核心 ---
+        function inputPass(num) {
+            if (currentInput.length >= 6) return;
+            currentInput += num;
+            updatePassDots();
+            
+            if (currentInput.length === 6) {
+                setTimeout(() => {
+                    if (currentInput === appPass) {
+                        currentUserRole = 'admin'; // ✨ [新增] 辨識為管理者 ✨
+                        unlockApp();
+                    } else if (currentInput === guestPass) {
+                        currentUserRole = 'guest'; // ✨ [新增] 辨識為訪客 ✨
+                        unlockApp();
+                    } else {
+                        alert("密碼錯誤，請重新輸入");
+                        clearPass();
+                    }
+                }, 100);
+            }
+        }
+
+        function updatePassDots() {
+            const dots = document.getElementById('pass-dots').children;
+            for (let i = 0; i < 6; i++) {
+                if (i < currentInput.length) {
+                    dots[i].className = "w-4 h-4 rounded-full bg-indigo-400 border-2 border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)]";
+                } else {
+                    dots[i].className = "w-4 h-4 rounded-full border-2 border-white/30";
+                }
+            }
+        }
+
+        function clearPass() {
+            currentInput = "";
+            updatePassDots();
+        }
+
+        function unlockApp() {
+            const overlay = document.getElementById('lock-screen');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            overlay.style.transform = "scale(1.1)";
+            setTimeout(() => { overlay.classList.add('hidden'); }, 400);
+        }
+
+        function changeAppPassword(type) {
+            const inputId = type === 'admin' ? 'input-new-pass-admin' : 'input-new-pass-guest';
+            const newVal = document.getElementById(inputId).value.trim();
+            if (newVal.length !== 6 || isNaN(newVal)) {
+                showSettingsMsg("請輸入 6 位數純數字", false);
+                return;
+            }
+            if (type === 'admin') {
+                appPass = newVal;
+                localStorage.setItem('appPass', newVal);
+                showSettingsMsg("管理者密碼更新成功！");
+            } else {
+                guestPass = newVal;
+                localStorage.setItem('guestPass', newVal);
+                showSettingsMsg("訪客密碼更新成功！");
+            }
+            document.getElementById(inputId).value = "";
+        }
+
+        // ✨ [修改] 終極多幣別點對點轉帳指南演算法 ✨
+        function openSettlement() {
+            const titleEl = document.getElementById('settlementTitle');
+            if (titleEl) titleEl.innerHTML = `<i class="ph ph-calculator text-indigo-600 text-xl"></i> 旅程最終轉帳總清結`;
+            
+            calculateSettlement();
+            const m = document.getElementById('settlementModal'), c = document.getElementById('settlementContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('translate-y-full'); });
+        }
+
+        function closeSettlement() {
+            const m = document.getElementById('settlementModal'), c = document.getElementById('settlementContent');
+            m.classList.add('opacity-0'); c.classList.add('translate-y-full');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+
+        function calculateSettlement() {
+            const container = document.getElementById('settlement-results');
+            
+            // 1. 自動搜集帳本中所有出現過的幣別 (例如: TWD, JPY)
+            const allCurrencies = [...new Set(records.map(r => r.currency))];
+            
+            if (records.length === 0 || allCurrencies.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 text-gray-400 font-bold text-sm">目前無任何記帳紀錄，無法計算結算報告。</div>';
+                return;
+            }
+
+            let finalHtml = '<div class="space-y-6">';
+            let globalHasDebts = false;
+
+            // 2. 針對每種幣別獨立拆分計算，不受首頁切換影響
+            allCurrencies.forEach(curr => {
+                let balances = {};
+                members.forEach(m => balances[m] = 0);
+
+                // 只抓取該幣別的支出紀錄
+                const currRecords = records.filter(r => r.currency === curr && r.type === 'expense');
+
+                currRecords.forEach(r => {
+                    // ✨ [修正] 遇到「公費」或「系統入帳」，代表無人私下代墊，完全跳過不列入私人債務計算 ✨
+                    if (!r.payer || r.payer === '公費' || r.payer === '系統入帳') return;
+
+                    if (r.participants) {
+                        let parts = r.participants.split(',').map(p => p.trim()).filter(Boolean);
+                        if (parts.length === 0) return;
+                        
+                        let splitAmt = r.amount / parts.length;
+                        
+                        // 付款人獲得債權 (代墊總額)
+                        balances[r.payer] = (balances[r.payer] || 0) + r.amount;
+                        
+                        // 分攤者承擔債務 (扣除應付額)
+                        parts.forEach(p => {
+                            balances[p] = (balances[p] || 0) - splitAmt;
+                        });
+                    }
+                });
+
+                // ✨ [新增] 精確計算該幣別的公費錢包總賸餘 (收入減支出) ✨
+                // ✨ [修正] 移除 '公費' 類別限制，確保「退款」等所有無私人擁有的群體收入皆正確納入公費總額，避免帳務遺漏 ✨
+                const publicIncome = records.filter(r => r.currency === curr && r.type === 'income').reduce((sum, r) => sum + r.amount, 0);
+                const publicExpense = records.filter(r => r.currency === curr && r.type === 'expense' && r.payer === '公費').reduce((sum, r) => sum + r.amount, 0);
+                const publicSurplus = publicIncome - publicExpense;
+                
+                const hasPublicRefund = publicSurplus > 1; // 賸餘大於 1 元才啟動退款機制
+
+                // 將成員區分為 債權人陣列 與 債務人陣列
+                let creditors = [];
+                let debtors = [];
+
+                for (const [member, bal] of Object.entries(balances)) {
+                    let roundedBal = Math.round(bal);
+                    if (roundedBal > 1) {
+                        creditors.push({ name: member, amount: roundedBal });
+                    } else if (roundedBal < -1) {
+                        debtors.push({ name: member, amount: Math.abs(roundedBal) });
+                    }
+                }
+
+                // ✨ [修改] 只要有公費結餘或有私人債務，就渲染該幣別面板 ✨
+                if (hasPublicRefund || creditors.length > 0 || debtors.length > 0) {
+                    globalHasDebts = true;
+                    
+                    finalHtml += `
+                    <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 shadow-sm">
+                        <h4 class="font-black text-indigo-900 text-sm flex items-center gap-1.5 mb-3 border-b border-gray-200 pb-2">
+                            <i class="ph ph-currency-circle-dollar text-lg text-indigo-500"></i> ${curr} 幣別結算報告
+                        </h4>
+                        <div class="space-y-4">`;
+
+                    // 📢 (區塊 A) 處理公費結餘現場退款指示
+                    if (hasPublicRefund) {
+                        // ✨ [修改] 智慧動態辨識：優先使用雲端設定的有交公費名單，若無資料則預設全體平分 ✨
+                        const publicPayers = (window.currentPublicPayers && window.currentPublicPayers.length > 0) 
+                            ? window.currentPublicPayers 
+                            : members;
+                        const refundPerPerson = Math.round(publicSurplus / publicPayers.length);
+                        
+                        finalHtml += `
+                        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                            <div class="flex justify-between items-center text-xs font-bold text-amber-800">
+                                <span class="flex items-center gap-1"><i class="ph ph-coins"></i> 💰 公費現金包目前剩餘：</span>
+                                <span class="text-sm font-black">${Math.round(publicSurplus).toLocaleString()} ${curr}</span>
+                            </div>
+                            <p class="text-[10px] text-amber-600 leading-tight">退還方案（由公費包管理員現場分發退款）：</p>
+                            <div class="grid grid-cols-1 gap-1.5 pt-1">`;
+                        
+                        publicPayers.forEach(payer => {
+                            finalHtml += `
+                            <div class="flex justify-between items-center bg-white border border-amber-100 px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
+                                <span>👤 ${payer} 現場拿回</span>
+                                <span class="text-amber-600 font-black">+ ${refundPerPerson.toLocaleString()} ${curr}</span>
+                            </div>`;
+                        });
+                        
+                        finalHtml += `</div></div>`;
+                    }
+
+                    // 📢 (區塊 B) 處理私人代墊點對點轉帳指南
+                    if (creditors.length > 0 || debtors.length > 0) {
+                        finalHtml += `<div class="space-y-2.5">`;
+                        if (hasPublicRefund) {
+                            finalHtml += `<p class="text-[10px] text-gray-400 font-bold mb-1">🤝 私人代墊轉帳清單（現場公費退完後，再依此進行匯款）：</p>`;
+                        }
+
+                        let cIdx = 0, dIdx = 0;
+                        while (cIdx < creditors.length && dIdx < debtors.length) {
+                            let creditor = creditors[cIdx];
+                            let debtor = debtors[dIdx];
+                            let settleAmt = Math.min(creditor.amount, debtor.amount);
+                            
+                            finalHtml += `
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[10px] font-bold border border-red-100">誰付錢</span>
+                                    <span class="font-black text-gray-800 text-sm">${debtor.name}</span>
+                                    <i class="ph ph-arrow-fat-right text-indigo-400 animate-pulse"></i>
+                                    <span class="px-1.5 py-0.5 bg-green-50 text-green-600 rounded text-[10px] font-bold border border-green-100">給誰</span>
+                                    <span class="font-black text-gray-800 text-sm">${creditor.name}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold text-gray-400 mr-0.5">金額:</span>
+                                    <span class="text-base font-black text-indigo-600">${Math.round(settleAmt).toLocaleString()}</span>
+                                    <span class="text-[10px] font-black text-gray-400 uppercase">${curr}</span>
+                                </div>
+                            </div>`;
+                            
+                            creditor.amount -= settleAmt;
+                            debtor.amount -= settleAmt;
+                            
+                            if (creditor.amount <= 1) cIdx++;
+                            if (debtor.amount <= 1) dIdx++;
+                        }
+                        finalHtml += `</div>`;
+                    }
+
+                    finalHtml += `</div></div>`;
+                }
+            });
+
+            if (!globalHasDebts) {
+                finalHtml += `
+                <div class="text-center py-12 text-gray-400 font-bold text-lg">
+                    <i class="ph ph-hands-clapping text-5xl mb-3 text-indigo-300"></i><br>
+                    目前沒有任何跨幣別欠款關係！<br>
+                    大家全數結清互不相欠！
+                </div>`;
+            }
+
+            finalHtml += '</div>';
+            container.innerHTML = finalHtml;
+        }
+
+        async function shareSettlement() {
+            const container = document.getElementById('settlement-results');
+            if (!container || container.innerText.trim() === '') {
+                alert('目前無結算資料可供分享');
+                return;
+            }
+            
+            const reportText = "【" + currentTripId + " 旅遊分帳結算報告】\n\n" + container.innerText.replace(/\n\s*\n/g, '\n');
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: '旅遊分帳結算報告',
+                        text: reportText
+                    });
+                } catch (error) {
+                    console.log('分享取消或失敗', error);
+                }
+            } else {
+                // 不支援 Web Share API 的降級處理 (例如複製到剪貼簿)
+                navigator.clipboard.writeText(reportText).then(() => {
+                    alert('已複製結算報告至剪貼簿！');
+                }).catch(err => {
+                    alert('複製失敗，請手動選取複製');
+                });
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
