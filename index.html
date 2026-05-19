@@ -317,7 +317,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.2 多人旅遊分帳
+                System Version: v0.0.0.3 多人旅遊分帳
             </div>
         </div>
     </div>
@@ -373,11 +373,21 @@
 
             combinedMembers.forEach(m => {
                 // 檢查該成員在當前消費日期是否已經加入旅程
+                
                 const memberInfo = (window.memberDetailsList || []).find(info => info.name === m);
                 let isJoined = true;
                 if (memberInfo && memberInfo.join_date && currentRecordDate) {
+                    // ✨ [修復1] 將字串轉換為 Date 物件比對時間戳，避免 ASCII 編碼 "-" < "/" 的字串比對失誤 ✨
+                    const recordDateObj = new Date(currentRecordDate);
+                    recordDateObj.setHours(0, 0, 0, 0);
+                    
+                    // 確保日期字串格式相容 (處理可能含有中文"上午"等時間尾碼的情況)
+                    const cleanJoinDateStr = String(memberInfo.join_date).split(' ')[0].replace(/\//g, '-');
+                    const joinDateObj = new Date(cleanJoinDateStr);
+                    joinDateObj.setHours(0, 0, 0, 0);
+
                     // 若消費日期早於該成員的加入日期，標記為尚未加入
-                    if (currentRecordDate < memberInfo.join_date) {
+                    if (recordDateObj.getTime() < joinDateObj.getTime()) {
                         isJoined = false;
                     }
                 }
