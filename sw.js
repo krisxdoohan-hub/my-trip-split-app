@@ -3,7 +3,7 @@
 // ==========================================
 
 // ✨ [系統版本識別] 每次更新主程式時，請同步更改此處版本號 ✨
-const SW_VERSION = 'v0.0.0.4'; 
+const SW_VERSION = 'v0.0.0.5'; 
 const CACHE_NAME = `trip-split-cache-${SW_VERSION}`;
 
 // 需要快取的核心檔案清單
