@@ -266,9 +266,12 @@
                     <h4 class="font-bold text-blue-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-identification-card text-blue-500 text-lg"></i> 本機身分綁定 (Identity Binding)</h4>
                     <div class="space-y-3">
                         <p class="text-[10px] text-blue-700 leading-tight">綁定後，新增帳目將自動預設您為付款人，並作為權限驗證憑證。</p>
-                        <select id="cfg-my-identity" onchange="saveIdentity()" class="w-full border-blue-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none font-bold text-gray-800 shadow-sm">
+                        <select id="cfg-my-identity" class="w-full border-blue-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none font-bold text-gray-800 shadow-sm mb-1">
                             <option value="">-- 請選擇您的身分 --</option>
                         </select>
+                        <button onclick="saveIdentity()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg active:scale-95 transition text-xs shadow-sm shadow-blue-200 focus:outline-none flex justify-center items-center gap-1">
+                            <i class="ph ph-lock-simple"></i> 確認綁定並鎖定身分
+                        </button>
                     </div>
                 </div>
 
@@ -317,7 +320,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.3 多人旅遊分帳
+                System Version: v0.0.0.4 多人旅遊分帳-智慧分攤版
             </div>
         </div>
     </div>
@@ -832,8 +835,17 @@
                 payer = payerSel ? payerSel.value : '公費';
                 
                 const checkedBoxes = document.querySelectorAll('#input-participants input[type="checkbox"]:checked');
-                const parts = Array.from(checkedBoxes).map(cb => cb.value);
-                if (parts.length === 0) { alert("請至少選擇一位分攤對象"); return; }
+                let parts = Array.from(checkedBoxes).map(cb => cb.value);
+                
+                // ✨ [修復1] 若未勾選任何分攤對象，且付款人為特定成員時，自動切換為「私人自費模式」（分攤者僅有付款人自己） ✨
+                if (parts.length === 0) {
+                    if (payer !== '公費' && payer !== '系統入帳') {
+                        parts = [payer];
+                    } else {
+                        alert("公費支出請至少選擇一位分攤對象或預設全體成員"); 
+                        return; 
+                    }
+                }
                 participantsStr = parts.join(','); // 將陣列轉為逗號分隔字串
             }
 
@@ -949,9 +961,22 @@
         // ✨ [新增] 儲存身分綁定 ✨
         function saveIdentity() {
             const sel = document.getElementById('cfg-my-identity');
-            myIdentity = sel.value;
+            const selectedValue = sel.value;
+            
+            // ✨ [修復3] 增加未選取身分時的阻擋驗證 ✨
+            if (!selectedValue) { 
+                showSettingsMsg("請先選取一個有效的人員身分", false); 
+                alert("請先選擇您的名字，再點擊確認綁定！");
+                return; 
+            }
+            
+            myIdentity = selectedValue;
             localStorage.setItem('tripSplit_myIdentity', myIdentity);
-            showSettingsMsg("身分綁定成功！");
+            showSettingsMsg("身分綁定成功並已鎖定！");
+            
+            // ✨ [修復4] 綁定成功後，立即重新調用 openSettings() 重新整理設定視窗的 DOM 顯示狀態。
+            // 若此時為訪客（Guest）權限，身分欄位與旅程代碼欄位將會立刻執行安全封鎖隱藏。 ✨
+            openSettings();
         }
 
         // ✨ [新增] 動態渲染活躍成員清單 ✨
@@ -1187,14 +1212,34 @@
             currentInput += num;
             updatePassDots();
             
+            
             if (currentInput.length === 6) {
                 setTimeout(() => {
+                    // ✨ [新增] 超級救援金鑰設定為 089478 ✨
+                    const RECOVERY_KEY = "089478";
+
                     if (currentInput === tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass) {
                         currentUserRole = 'admin'; // ✨ [新增] 辨識為管理者 ✨
                         unlockApp();
                     } else if (currentInput === guestPass) {
                         currentUserRole = 'guest'; // ✨ [新增] 辨識為訪客 ✨
                         unlockApp();
+                    } else if (currentInput === RECOVERY_KEY) {
+                        // ✨ [新增] 觸發獨立的超級救援程序：去代號化字串比對 ✨
+                        let choice = prompt("【系統救援模式】\n為確保安全性，本系統嚴禁使用任何數字或符號代號。\n\n請在下方輸入框「完整手寫輸入」您要執行的重置選項名稱：\n\n- 輸入「管理者密碼」：重置主管權限密碼為 000000\n- 輸入「清除訪客密碼」：重置訪客權限密碼為 111111\n\n(輸入錯誤、包含代號或點擊取消將直接退出救援程序)");
+                        
+                        if (choice === "管理者密碼") {
+                            localStorage.removeItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass');
+                            tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass = "000000"; 
+                            alert("認證成功！已成功將「管理者密碼」重置為預設值 (000000)！");
+                        } else if (choice === "清除訪客密碼") {
+                            localStorage.removeItem('guestPass');
+                            guestPass = "111111"; 
+                            alert("認證成功！已成功將「訪客密碼」重置為預設值 (111111)！");
+                        } else if (choice !== null) {
+                            alert("偵測到輸入非法代號或選項名稱不正確，系統已自動安全退出。");
+                        }
+                        clearPass(); // 救援結束後清空密碼輸入點點，讓您重新輸入正確的密碼登入
                     } else {
                         alert("密碼錯誤，請重新輸入");
                         clearPass();
