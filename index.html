@@ -317,7 +317,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.1 多人旅遊分帳
+                System Version: v0.0.0.2 多人旅遊分帳
             </div>
         </div>
     </div>
@@ -666,7 +666,8 @@
                         
                         // 處理分攤對象標籤
                         if (r.participants) {
-                            let partsArray = r.participants.split(',');
+                            // ✨ [修復3] 強制轉型為字串，防止純數字造成 split 報錯使清單渲染崩潰 ✨
+                            let partsArray = String(r.participants).split(',');
                             let partsText = partsArray.length >= 3 ? '全體' : partsArray.join(',');
                             accBadge += `<span class="inline-block bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 shadow-sm">分: ${partsText}</span>`;
                         }
@@ -963,13 +964,17 @@
         }
 
         // ✨ [新增] 新增成員並寫入雲端 ✨
+        let isAddingMember = false; // ✨ [新增] 防止連點的非同步防呆鎖
         async function addNewMember() {
+            if (isAddingMember) return; // 若正在連線處理中則拒絕執行
             const input = document.getElementById('input-new-member');
             const newName = input.value.trim();
             if (!newName) { showSettingsMsg("請輸入姓名", false); return; }
             if (members.includes(newName)) { showSettingsMsg("成員已存在", false); return; }
             if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
 
+            isAddingMember = true; // 上鎖
+            input.value = ''; // ✨ [修復2] 立即清空輸入框，避免視覺殘留導致使用者繼續點擊
             showSettingsMsg("正在新增成員...");
             updateCloudIcon('unsynced');
             
@@ -985,7 +990,6 @@
                 });
                 const result = await res.json();
                 if(result.status === 'success') {
-                    input.value = '';
                     showSettingsMsg(`${newName} 已成功加入！`);
                     forceSyncDownload(); // 強制刷新下載新名單
                 } else {
@@ -994,6 +998,8 @@
             } catch(error) {
                 console.error("API 連線錯誤:", error);
                 showSettingsMsg("連線錯誤", false);
+            } finally {
+                isAddingMember = false; // 處理完畢後無論成功失敗皆解鎖
             }
         }
 
@@ -1029,6 +1035,7 @@
         }
 
         // ✨ [修改] 替換為旅程代碼管理與暫存的同步按鈕邏輯 ✨
+       
         function saveTripId() {
             // ✨ [修正] 強制將輸入的代碼轉換為大寫，確保跨裝置輸入大小寫時皆視為相同專案 ✨
             const newId = document.getElementById('cfg-trip-id').value.trim().toUpperCase();
@@ -1047,6 +1054,10 @@
             showSettingsMsg("代碼切換中...");
             renderAll();
             renderIdentitySelect(); // 刷新選單
+            
+            // ✨ [修復1] 立即清空輸入框並提供明確的系統彈窗，讓使用者確認已建立/載入 ✨
+            document.getElementById('cfg-trip-id').value = '';
+            alert(`旅程專案 [${currentTripId}] 已成功建立與載入！`);
             
             // ✨ [新增] 切換代碼後，立刻觸發雲端下載 ✨
             forceSyncDownload();
@@ -1263,12 +1274,14 @@
                 // 只抓取該幣別的支出紀錄
                 const currRecords = records.filter(r => r.currency === curr && r.type === 'expense');
 
+                
                 currRecords.forEach(r => {
                     // ✨ [修正] 遇到「公費」或「系統入帳」，代表無人私下代墊，完全跳過不列入私人債務計算 ✨
                     if (!r.payer || r.payer === '公費' || r.payer === '系統入帳') return;
 
                     if (r.participants) {
-                        let parts = r.participants.split(',').map(p => p.trim()).filter(Boolean);
+                        // ✨ [修復3] 結算邏輯同樣強制轉型為字串防呆 ✨
+                        let parts = String(r.participants).split(',').map(p => p.trim()).filter(Boolean);
                         if (parts.length === 0) return;
                         
                         let splitAmt = r.amount / parts.length;
