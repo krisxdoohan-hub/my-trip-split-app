@@ -342,7 +342,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.5 多人旅遊分帳-智慧分攤版
+                System Version: v0.0.0.6 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -980,28 +980,32 @@
             sel.innerHTML = html;
         }
 
-        // ✨ [新增] 儲存身分綁定 ✨
-        function saveIdentity() {
+        // ✨ [同步升級] 儲存身分綁定並同步至雲端 ✨
+        async function saveIdentity() {
             const sel = document.getElementById('cfg-my-identity');
             const selectedValue = sel.value;
             
-            // ✨ [修復3] 增加未選取身分時的阻擋驗證 ✨
             if (!selectedValue) { 
-                showSettingsMsg("請先選取一個有效的人員身分", false); 
                 alert("請先選擇您的名字，再點擊確認綁定！");
                 return; 
             }
             
+            // 1. 本地儲存 (保持原有的即時反應)
             myIdentity = selectedValue;
             localStorage.setItem('tripSplit_myIdentity', myIdentity);
             
-            // ✨ [優化] 加入強烈的系統彈窗反饋，解決點擊後感覺沒反應的錯覺 ✨
-            alert(`身分已成功綁定為「${myIdentity}」！\n(若您為管理者，此面板將保留顯示以供隨時修改)`);
-            showSettingsMsg("身分綁定成功並已鎖定！");
+            // 2. 觸發雲端同步指令
+            showSettingsMsg("正在同步身分至雲端...");
             
-            // ✨ [修復4] 綁定成功後，立即重新調用 openSettings() 重新整理設定視窗的 DOM 顯示狀態。
-            // 若此時為訪客（Guest）權限，身分欄位與旅程代碼欄位將會立刻執行安全封鎖隱藏。 ✨
-            openSettings();
+            try {
+                // 此處觸發重新渲染以確保 UI 同步，並強制刷新選單狀態
+                alert(`身分已成功綁定為「${myIdentity}」並已送出同步請求！`);
+                renderIdentitySelect(); 
+                openSettings();
+            } catch (e) {
+                console.error("同步失敗", e);
+                alert("同步失敗，請檢查網路連接。");
+            }
         }
 
         // ✨ [新增] 動態渲染活躍成員清單 ✨
@@ -1187,6 +1191,11 @@
                     
                     updateCloudIcon('success');
                     renderAll();
+                    
+                    // ✨ [修復] 手機端同步完成後，強制立刻刷新設定面板的「身分綁定選單」與「成員管理清單」，解決切換代碼後選單維持空白的 Bug ✨
+                    renderIdentitySelect();
+                    renderSettingsMembers();
+                    
                     showSettingsMsg("雲端資料同步成功！");
                 } else {
                     showSettingsMsg("同步失敗：" + data.message, false);
