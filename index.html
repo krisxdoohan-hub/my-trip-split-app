@@ -65,6 +65,28 @@
         </div>
     </div>
 
+    <div id="recovery-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[250] hidden flex-col justify-center items-center p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full max-w-[320px] rounded-[24px] shadow-2xl p-6 text-center transform scale-95 transition-transform duration-300" id="recovery-content">
+            <div class="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
+                <i class="ph ph-warning text-2xl text-amber-500"></i>
+            </div>
+            <h3 class="text-xl font-black text-gray-800 mb-2">系統救援模式</h3>
+            <p class="text-sm font-medium text-gray-500 mb-6">您已輸入超級金鑰，請選擇要執行的動作：</p>
+            
+            <div class="space-y-3">
+                <button onclick="executeRecovery('admin')" class="w-full bg-[#da291c] hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-sm active:scale-95 tracking-wide focus:outline-none">
+                    重置「管理者」密碼
+                </button>
+                <button onclick="executeRecovery('guest')" class="w-full bg-[#f6821f] hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-sm active:scale-95 tracking-wide focus:outline-none">
+                    重置「訪客」密碼
+                </button>
+                <button onclick="closeRecoveryModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3.5 rounded-xl transition duration-200 active:scale-95 tracking-wide mt-2 focus:outline-none">
+                    取消並返回
+                </button>
+            </div>
+        </div>
+    </div>
+
     <header class="bg-white px-4 py-3 shadow-sm z-30 flex justify-between items-center flex-shrink-0">
         <div class="flex items-center gap-2 text-indigo-700">
             <i class="ph ph-wallet text-2xl"></i>
@@ -320,7 +342,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.4 多人旅遊分帳-智慧分攤版
+                System Version: v0.0.0.5 多人旅遊分帳-智慧分攤版
             </div>
         </div>
     </div>
@@ -972,6 +994,9 @@
             
             myIdentity = selectedValue;
             localStorage.setItem('tripSplit_myIdentity', myIdentity);
+            
+            // ✨ [優化] 加入強烈的系統彈窗反饋，解決點擊後感覺沒反應的錯覺 ✨
+            alert(`身分已成功綁定為「${myIdentity}」！\n(若您為管理者，此面板將保留顯示以供隨時修改)`);
             showSettingsMsg("身分綁定成功並已鎖定！");
             
             // ✨ [修復4] 綁定成功後，立即重新調用 openSettings() 重新整理設定視窗的 DOM 顯示狀態。
@@ -1225,21 +1250,8 @@
                         currentUserRole = 'guest'; // ✨ [新增] 辨識為訪客 ✨
                         unlockApp();
                     } else if (currentInput === RECOVERY_KEY) {
-                        // ✨ [新增] 觸發獨立的超級救援程序：去代號化字串比對 ✨
-                        let choice = prompt("【系統救援模式】\n為確保安全性，本系統嚴禁使用任何數字或符號代號。\n\n請在下方輸入框「完整手寫輸入」您要執行的重置選項名稱：\n\n- 輸入「管理者密碼」：重置主管權限密碼為 000000\n- 輸入「清除訪客密碼」：重置訪客權限密碼為 111111\n\n(輸入錯誤、包含代號或點擊取消將直接退出救援程序)");
-                        
-                        if (choice === "管理者密碼") {
-                            localStorage.removeItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass');
-                            tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass = "000000"; 
-                            alert("認證成功！已成功將「管理者密碼」重置為預設值 (000000)！");
-                        } else if (choice === "清除訪客密碼") {
-                            localStorage.removeItem('guestPass');
-                            guestPass = "111111"; 
-                            alert("認證成功！已成功將「訪客密碼」重置為預設值 (111111)！");
-                        } else if (choice !== null) {
-                            alert("偵測到輸入非法代號或選項名稱不正確，系統已自動安全退出。");
-                        }
-                        clearPass(); // 救援結束後清空密碼輸入點點，讓您重新輸入正確的密碼登入
+                        // ✨ [修改] 攔截成功，直接呼叫客製化按鈕彈窗 ✨
+                        openRecoveryModal();
                     } else {
                         alert("密碼錯誤，請重新輸入");
                         clearPass();
@@ -1269,6 +1281,36 @@
             overlay.classList.add('opacity-0', 'pointer-events-none');
             overlay.style.transform = "scale(1.1)";
             setTimeout(() => { overlay.classList.add('hidden'); }, 400);
+        }
+
+        // ✨ [新增] 控制系統救援彈窗與密碼重置的專屬函式 ✨
+        function openRecoveryModal() {
+            const m = document.getElementById('recovery-modal');
+            const c = document.getElementById('recovery-content');
+            if(!m || !c) return;
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('scale-95'); c.classList.add('scale-100'); });
+        }
+
+        function closeRecoveryModal() {
+            const m = document.getElementById('recovery-modal');
+            const c = document.getElementById('recovery-content');
+            if(!m || !c) return;
+            m.classList.add('opacity-0'); c.classList.remove('scale-100'); c.classList.add('scale-95');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); clearPass(); }, 300);
+        }
+
+        function executeRecovery(type) {
+            if (type === 'admin') {
+                localStorage.removeItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass');
+                tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass = "000000"; 
+                alert("已成功將「管理者密碼」重置為預設值 (000000)！");
+            } else if (type === 'guest') {
+                localStorage.removeItem('guestPass');
+                guestPass = "111111"; 
+                alert("已成功將「訪客密碼」重置為預設值 (111111)！");
+            }
+            closeRecoveryModal(); // 執行完畢後自動關閉彈窗
         }
 
         function changetripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPassword(type) {
