@@ -453,13 +453,6 @@
         </div>
     </div>
 
-        <button onclick="createNewTripAfterArchive()" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-black py-4 rounded-2xl transition duration-200 active:scale-95 text-lg flex justify-center items-center gap-2 focus:outline-none">
-                    <i class="ph ph-plus-circle text-2xl"></i> 建立新旅程
-                </button>
-            </div>
-        </div>
-    </div>
-
     <div id="forceOnboardingModal" class="fixed inset-0 bg-gray-900/95 backdrop-blur-md z-[9999] hidden flex-col justify-center items-center p-6 transition-opacity duration-300 opacity-0">
         <div class="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-8 text-center flex flex-col gap-4">
             <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto shadow-inner border border-indigo-100">
@@ -474,10 +467,6 @@
         </div>
     </div>
     
-    <script>
-
-        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }    
-
     <script>
 
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }
