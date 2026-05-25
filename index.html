@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.6 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.7 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -1520,26 +1520,30 @@
             const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
             
             // ✨ [修正] 徹底重新劃分介面權限：主揪保有全部權限，一般旅客固定顯示基礎必備功能 ✨
-        const dbBlock = document.getElementById('setting-block-database');
-        if (dbBlock) dbBlock.style.display = isOwner ? 'block' : 'none';
-        
-        // 旅程專案設定：確保新成員可用以確認或手動輸入代碼
-        const tripBlock = document.getElementById('setting-block-trip');
-        if (tripBlock) tripBlock.style.display = 'block';
-        
-        // ✨ [修正] 本機身分綁定：主揪始終可見；一般成員若「尚未綁定」才可見，綁定後立即隱藏！ ✨
-        const idBlock = document.getElementById('setting-block-identity');
-        if (idBlock) idBlock.style.display = (isOwner || !myIdentity) ? 'block' : 'none';
-        
-        // ✨ [修正] 修改專屬暱稱：必須是「已綁定」的狀態下才顯示 ✨
-        const nicknameBlock = document.getElementById('setting-block-nickname');
-        if (nicknameBlock) nicknameBlock.style.display = myIdentity ? 'block' : 'none';
+            const dbBlock = document.getElementById('setting-block-database');
+            if (dbBlock) dbBlock.style.display = isOwner ? 'block' : 'none';
+            
+            // 旅程專案設定：確保新成員可用以確認或手動輸入代碼
+            const tripBlock = document.getElementById('setting-block-trip');
+            if (tripBlock) tripBlock.style.display = 'block';
+            
+            // ✨ [極致防護] 本機身分綁定：如果是主揪，永遠可見以便管理；如果是一般成員，只要「已經綁定」就徹底隱藏，杜絕改綁別人！
+            const idBlock = document.getElementById('setting-block-identity');
+            if (idBlock) {
+                idBlock.style.display = (isOwner || !myIdentity) ? 'block' : 'none';
+            }
+            
+            // 修改專屬暱稱：必須是「已綁定」的狀態下才顯示
+            const nicknameBlock = document.getElementById('setting-block-nickname');
+            if (nicknameBlock) {
+                nicknameBlock.style.display = myIdentity ? 'block' : 'none';
+            }
 
-        // 人員管理 & 安全性設定：絕對僅限主揪可見，避免一般旅客誤按離隊
-        const memBlock = document.getElementById('setting-block-members');
-        if (memBlock) memBlock.style.display = isOwner ? 'block' : 'none';
-        const secBlock = document.getElementById('setting-block-security');
-        if (secBlock) secBlock.style.display = isOwner ? 'block' : 'none';
+            // 人員管理 & 安全性設定：絕對僅限主揪可見，避免一般旅客誤按離隊
+            const memBlock = document.getElementById('setting-block-members');
+            if (memBlock) memBlock.style.display = isOwner ? 'block' : 'none';
+            const secBlock = document.getElementById('setting-block-security');
+            if (secBlock) secBlock.style.display = isOwner ? 'block' : 'none';
             
             const m = document.getElementById('settingsModal'), c = document.getElementById('settingsContent');
             m.classList.remove('hidden'); m.classList.add('flex');
@@ -1575,11 +1579,12 @@
         myIdentity = selectedValue;
         localStorage.setItem('tripSplit_myIdentity', myIdentity);
         
-        // 2. 觸發雲端同步指令，將身分寫入使用者的全域雲端配置 ✨
+        // 2. 觸發雲端同步指令
         showSettingsMsg("正在同步身分至雲端...");
         
         try {
-            if (window.db && window.firebaseAuth && window.firebaseAuth.currentUser) {
+            // ✨ [核心修復] 手動綁定後也必須寫回雲端
+            if (window.firebaseAuth && window.firebaseAuth.currentUser) {
                 const uid = window.firebaseAuth.currentUser.uid;
                 const userRef = window.fsDoc(window.db, 'users', uid);
                 const userSnap = await window.fsGetDoc(userRef);
@@ -1588,12 +1593,12 @@
                     const updatedTrips = existingTripIds.map(t =>
                         t.tripId === currentTripId ? { ...t, identity: myIdentity } : t
                     );
-                    await window.fsUpdateDoc(userRef, { tripIds: updatedTrips });
+                    await window.fsUpdateDoc(userRef, { tripIds: updatedTrips }, { merge: true });
                 }
             }
 
             // 此處觸發重新渲染以確保 UI 同步，並強制刷新選單狀態
-            alert(`身分已成功綁定為「${myIdentity}」並已送出同步請求！`);
+            alert(`身分已綁定並同步至雲端，請繼續使用！`);
             renderIdentitySelect(); 
             openSettings();
         } catch (e) {
@@ -1807,10 +1812,26 @@
             const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
             if (!currentUser) { showSettingsMsg("請先登入後再操作旅程", false); return; }
 
-            // 切換不同旅程時，清除舊身分綁定
+            // ✨ [核心修復] 切換不同旅程時，先嘗試從雲端歷史紀錄中找回身分，若無才清空
             if (currentTripId !== newId) {
-                myIdentity = "";
-                localStorage.removeItem('tripSplit_myIdentity');
+                let recoveredIdentity = "";
+                try {
+                    const userRef = window.fsDoc(window.db, 'users', currentUser.uid);
+                    const userSnap = await window.fsGetDoc(userRef);
+                    if (userSnap.exists()) {
+                        const existingTrip = (userSnap.data().tripIds || []).find(t => t.tripId === newId);
+                        if (existingTrip && existingTrip.identity) {
+                            recoveredIdentity = existingTrip.identity;
+                        }
+                    }
+                } catch(e) {}
+                
+                myIdentity = recoveredIdentity;
+                if (myIdentity) {
+                    localStorage.setItem('tripSplit_myIdentity', myIdentity);
+                } else {
+                    localStorage.removeItem('tripSplit_myIdentity');
+                }
             }
 
             showLoading("正在建立或加入旅程...");
@@ -1856,7 +1877,7 @@
                 const existingTripIds = userSnap.exists() ? (userSnap.data().tripIds || []) : [];
                 const filteredTripIds = existingTripIds.filter(t => t.tripId !== newId);
                 const updatedTripIds = [
-                    { tripId: newId, lastAccess: new Date().toISOString() },
+                    { tripId: newId, identity: myIdentity, lastAccess: new Date().toISOString() },
                     ...filteredTripIds
                 ];
                 await window.fsSetDoc(userRef, {
@@ -2108,40 +2129,39 @@
                 if (window.onAuthStateChanged && window.firebaseAuth) {
                     window.onAuthStateChanged(window.firebaseAuth, async (user) => {
                         if (user) {
-                            // ✨ [修改] 移除錯誤的 myIdentity 綁定 ✨
                             currentUserRole = 'admin';
-
-                            // ✨ [新增] 自動救援機制：若發現本機綁定了錯誤的信箱 UID，立即自動清除以解除面板鎖定 ✨
-                            if (myIdentity && !myIdentity.startsWith('mem_')) {
-                                myIdentity = "";
-                                localStorage.removeItem('tripSplit_myIdentity');
-                            }
-
                             unlockApp();
-                            
-                            // ✨ [修正] 登入解鎖後，第一時間攔截並觸發強制綁定檢查 ✨
-                            checkAndForceOnboarding();
 
-                            // ✨ [新增] 檢查 sessionStorage 是否有待處理的深層連結邀請 ✨
+                            // ✨ [核心修復] 1. 登入後第一時間從雲端 users 節點拉取該帳號的歷史身分，徹底解決 LINE 瀏覽器身分遺失問題
+                            try {
+                                const userRef = window.fsDoc(window.db, 'users', user.uid);
+                                const userSnap = await window.fsGetDoc(userRef);
+                                if (userSnap.exists() && currentTripId) {
+                                    const tripRecord = (userSnap.data().tripIds || []).find(t => t.tripId === currentTripId);
+                                    if (tripRecord && tripRecord.identity) {
+                                        myIdentity = tripRecord.identity;
+                                        localStorage.setItem('tripSplit_myIdentity', myIdentity);
+                                    }
+                                }
+                            } catch (e) { console.warn("身分同步讀取失敗", e); }
+
+                            // ✨ 2. 處理 LINE Deep Link 邀請
                             const pendingInvite = sessionStorage.getItem('tripSplit_pending_invite');
                             if (pendingInvite) {
                                 try {
                                     const { tripId, inviteCode } = JSON.parse(pendingInvite);
-
-                                    // 填入介面欄位
                                     document.getElementById('cfg-trip-id').value = tripId;
                                     document.getElementById('cfg-invite-code').value = inviteCode;
-
-                                    // 為了防呆，清理網址列上的參數，避免頁面重整時再次觸發
                                     window.history.replaceState({}, document.title, window.location.pathname);
+                                    await saveTripId(); 
+                                    sessionStorage.removeItem('tripSplit_pending_invite'); 
+                                } catch (e) { console.error("處理深層連結失敗:", e); }
+                            }
 
-                                    await saveTripId(); // 自動呼叫既有的加入旅程功能
-                                    sessionStorage.removeItem('tripSplit_pending_invite'); // 執行完畢後清除
-                                    
-                                    // ✨ [修正] 移除舊的手動引導，改由 forceSyncDownload 自動觸發強制蓋台 ✨
-                                } catch (e) {
-                                    console.error("處理深層連結失敗:", e);
-                                }
+                            // ✨ 3. 所有狀態與身分都從雲端恢復後，才進行畫面渲染與防呆蓋台檢查，避免誤觸發
+                            renderAll();
+                            if (currentTripId) {
+                                forceSyncDownload();
                             }
                         }
                     });
@@ -2199,7 +2219,7 @@
                 myIdentity = targetMemberId;
                 localStorage.setItem('tripSplit_myIdentity', myIdentity);
                 
-                // ✨ [新增] 同步綁定身分至 Firestore，防止跨瀏覽器遺失 ✨
+                // ✨ [核心修復] 立即將新綁定的身分寫回雲端使用者節點，確保跨裝置不遺失
                 if (window.firebaseAuth && window.firebaseAuth.currentUser) {
                     const uid = window.firebaseAuth.currentUser.uid;
                     const userRef = window.fsDoc(window.db, 'users', uid);
@@ -2209,7 +2229,7 @@
                         const updatedTrips = existingTripIds.map(t =>
                             t.tripId === currentTripId ? { ...t, identity: myIdentity } : t
                         );
-                        await window.fsUpdateDoc(userRef, { tripIds: updatedTrips });
+                        await window.fsUpdateDoc(userRef, { tripIds: updatedTrips }, { merge: true });
                     }
                 }
 
