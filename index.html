@@ -10,7 +10,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
         import {
             getFirestore,
             doc,
@@ -46,6 +46,7 @@
         window.signInWithEmailAndPassword = signInWithEmailAndPassword;
         window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
         window.onAuthStateChanged = onAuthStateChanged;
+        window.signOut = signOut;
 
         // ✨ [新增] 暴露 Firestore 實例與所有常用操作函數至全域 ✨
         window.db = db;
@@ -143,6 +144,9 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
+            <button onclick="handleFirebaseLogout()" class="text-rose-500 hover:text-rose-700 transition-colors p-1.5 rounded-full hover:bg-rose-50 focus:outline-none" title="登出系統">
+                <i class="ph ph-sign-out text-2xl"></i>
+            </button>
             <button onclick="openSettlement()" class="text-indigo-500 hover:text-indigo-700 transition-colors p-1.5 rounded-full hover:bg-indigo-50 focus:outline-none" title="計算分帳結果">
                 <i class="ph ph-calculator text-2xl"></i>
             </button>
@@ -408,7 +412,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.8 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.9 多人旅遊分帳-登出版
             </div>
         </div>
     </div>
@@ -2271,10 +2275,46 @@
             }
         }
 
-        function unlockApp() {            const overlay = document.getElementById('lock-screen');
+        function unlockApp() {            
+            const overlay = document.getElementById('lock-screen');
             overlay.classList.add('opacity-0', 'pointer-events-none');
             overlay.style.transform = "scale(1.1)";
             setTimeout(() => { overlay.classList.add('hidden'); }, 400);
+        }
+
+        async function handleFirebaseLogout() {
+            if (!window.firebaseAuth) return;
+            try {
+                showLoading("登出中...");
+                await window.signOut(window.firebaseAuth);
+                
+                // 清除暫存變數與陣列
+                currentTripId = "";
+                myIdentity = "";
+                records = [];
+                members = [];
+                window.currentPublicPayers = [];
+                if (typeof dbClear === 'function') await dbClear('recordsStore');
+                
+                // 恢復未登入畫面的輸入狀態
+                document.getElementById('fb-email').value = "";
+                document.getElementById('fb-password').value = "";
+                document.getElementById('fb-error-msg').style.opacity = '0';
+                
+                // 重新顯示鎖定畫面
+                const overlay = document.getElementById('lock-screen');
+                overlay.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    overlay.classList.remove('opacity-0', 'pointer-events-none');
+                    overlay.style.transform = "scale(1)";
+                });
+                
+                hideLoading();
+            } catch (error) {
+                console.error("登出失敗", error);
+                alert("登出失敗：" + error.message);
+                hideLoading();
+            }
         }
 
         // ✨ [新增] 控制系統救援彈窗與密碼重置的專屬函式 ✨
