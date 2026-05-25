@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.7 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.8 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -471,13 +471,17 @@
 
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }
 
-        // ✨ [新增] 網址深層連結 (Deep Linking) 攔截機制 ✨
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlTripId = urlParams.get('tripId');
-        const urlInviteCode = urlParams.get('invite');
-        if (urlTripId && urlInviteCode) {
-            sessionStorage.setItem('tripSplit_pending_invite', JSON.stringify({ tripId: urlTripId, inviteCode: urlInviteCode }));
+        // ✨ [核心修復] 網址深層連結 (Deep Linking) 強力攔截函數，確保手機與 LINE 端不漏接
+        function interceptDeepLink() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlTripId = urlParams.get('tripId') || urlParams.get('tripid'); 
+            const urlInviteCode = urlParams.get('invite');
+            if (urlTripId && urlInviteCode) {
+                sessionStorage.setItem('tripSplit_pending_invite', JSON.stringify({ tripId: urlTripId.toUpperCase(), inviteCode: urlInviteCode }));
+            }
         }
+        // 頁面第一時間加載時立刻執行一次攔截
+        interceptDeepLink();
 
         // ================= IndexedDB 核心封裝 =================
         let dbInstance = null;
@@ -1507,39 +1511,41 @@
 
         // ================= 設定與雲端中控台 =================
         function openSettings() {
-            loadTripConfig(); // ✨ [修改] 換成新的載入旅程代碼函數 ✨
-            renderSettingsMembers(); // ✨ [新增] 渲染成員管理清單 ✨
-            renderIdentitySelect(); // ✨ [新增] 渲染身分綁定選單 ✨
+            loadTripConfig(); 
+            renderSettingsMembers(); 
+            renderIdentitySelect(); 
             
-            // ✨ [新增] 雙重密碼權限管控機制 ✨
-            const isGuest = (currentUserRole === 'guest');
-            const isSetupComplete = (currentTripId !== "" && myIdentity !== "");
-            
-            // ✨ [新增] 動態比對當前登入者是否為該旅程的「開團主揪 (Owner)」 ✨
             const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
-            const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
             
-            // ✨ [修正] 徹底重新劃分介面權限：主揪保有全部權限，一般旅客固定顯示基礎必備功能 ✨
+            // ✨ [權限精確修復]：當雲端還沒載入完成或 ownerUid 為空時，絕對採取最高防護，預設為 false
+            let isOwner = false;
+            if (currentUser && window.currentTripOwnerUid && window.currentTripOwnerUid !== "") {
+                if (currentUser.uid === window.currentTripOwnerUid) {
+                    isOwner = true;
+                }
+            }
+            
+            // 資料庫維護區塊：只有主揪可見
             const dbBlock = document.getElementById('setting-block-database');
             if (dbBlock) dbBlock.style.display = isOwner ? 'block' : 'none';
             
-            // 旅程專案設定：確保新成員可用以確認或手動輸入代碼
+            // 旅程專案設定 (Trip ID)：如果是主揪才看得到。一般成員已經在旅程內，不允許隨意切換專案
             const tripBlock = document.getElementById('setting-block-trip');
-            if (tripBlock) tripBlock.style.display = 'block';
+            if (tripBlock) tripBlock.style.display = isOwner ? 'block' : 'none';
             
-            // ✨ [極致防護] 本機身分綁定：如果是主揪，永遠可見以便管理；如果是一般成員，只要「已經綁定」就徹底隱藏，杜絕改綁別人！
+            // ✨ [權限精確修復] 本機身分綁定：主揪始終可見以利調度；一般成員「尚未綁定」才看得到。一旦綁定完成，此區塊直接完全隱藏，徹底杜絕亂改綁！
             const idBlock = document.getElementById('setting-block-identity');
             if (idBlock) {
-                idBlock.style.display = (isOwner || !myIdentity) ? 'block' : 'none';
+                idBlock.style.display = (isOwner || (!myIdentity && members.length > 0)) ? 'block' : 'none';
             }
             
-            // 修改專屬暱稱：必須是「已綁定」的狀態下才顯示
+            // 修改專屬暱稱：一般旅客只要「完成身分綁定後」，這是他們唯一能操作的功能
             const nicknameBlock = document.getElementById('setting-block-nickname');
             if (nicknameBlock) {
                 nicknameBlock.style.display = myIdentity ? 'block' : 'none';
             }
 
-            // 人員管理 & 安全性設定：絕對僅限主揪可見，避免一般旅客誤按離隊
+            // 旅程成員管理與安全設定：嚴格規定只有主揪（Owner）可見與操作
             const memBlock = document.getElementById('setting-block-members');
             if (memBlock) memBlock.style.display = isOwner ? 'block' : 'none';
             const secBlock = document.getElementById('setting-block-security');
@@ -2132,22 +2138,40 @@
                             currentUserRole = 'admin';
                             unlockApp();
 
-                            // ✨ [核心修復] 1. 登入後第一時間從雲端 users 節點拉取該帳號的歷史身分，徹底解決 LINE 瀏覽器身分遺失問題
+                            // ✨ [時序重構] 1. 再次執行網址攔截，防止行動端環境非同步載入時丟失參數
+                            interceptDeepLink();
+
+                            // ✨ 2. 檢查是否有透過 LINE 點擊進來的待處理邀請連結，若有，優先覆蓋本機的 currentTripId
+                            const pendingInvite = sessionStorage.getItem('tripSplit_pending_invite');
+                            let hasInvite = false;
+                            if (pendingInvite) {
+                                try {
+                                    const { tripId, inviteCode } = JSON.parse(pendingInvite);
+                                    currentTripId = tripId;
+                                    currentInviteCode = inviteCode;
+                                    localStorage.setItem('tripSplit_tripId', currentTripId);
+                                    localStorage.setItem('tripSplit_inviteCode', currentInviteCode);
+                                    hasInvite = true;
+                                } catch(e) { console.error("解析暫存邀請失敗", e); }
+                            }
+
+                            // ✨ 3. 依據最新確定的 currentTripId，去雲端 users 節點討回跨裝置的歷史綁定身分
                             try {
-                                const userRef = window.fsDoc(window.db, 'users', user.uid);
-                                const userSnap = await window.fsGetDoc(userRef);
-                                if (userSnap.exists() && currentTripId) {
-                                    const tripRecord = (userSnap.data().tripIds || []).find(t => t.tripId === currentTripId);
-                                    if (tripRecord && tripRecord.identity) {
-                                        myIdentity = tripRecord.identity;
-                                        localStorage.setItem('tripSplit_myIdentity', myIdentity);
+                                if (currentTripId) {
+                                    const userRef = window.fsDoc(window.db, 'users', user.uid);
+                                    const userSnap = await window.fsGetDoc(userRef);
+                                    if (userSnap.exists()) {
+                                        const tripRecord = (userSnap.data().tripIds || []).find(t => t.tripId === currentTripId);
+                                        if (tripRecord && tripRecord.identity) {
+                                            myIdentity = tripRecord.identity;
+                                            localStorage.setItem('tripSplit_myIdentity', myIdentity);
+                                        }
                                     }
                                 }
-                            } catch (e) { console.warn("身分同步讀取失敗", e); }
+                            } catch (e) { console.warn("自動恢復雲端身分失敗", e); }
 
-                            // ✨ 2. 處理 LINE Deep Link 邀請
-                            const pendingInvite = sessionStorage.getItem('tripSplit_pending_invite');
-                            if (pendingInvite) {
+                            // ✨ 4. 若確認是新加入或切換專案，現在安全執行自動加入、寫入與切換
+                            if (hasInvite && pendingInvite) {
                                 try {
                                     const { tripId, inviteCode } = JSON.parse(pendingInvite);
                                     document.getElementById('cfg-trip-id').value = tripId;
@@ -2155,13 +2179,14 @@
                                     window.history.replaceState({}, document.title, window.location.pathname);
                                     await saveTripId(); 
                                     sessionStorage.removeItem('tripSplit_pending_invite'); 
-                                } catch (e) { console.error("處理深層連結失敗:", e); }
+                                } catch (e) { console.error("執行一鍵加入失敗:", e); }
                             }
 
-                            // ✨ 3. 所有狀態與身分都從雲端恢復後，才進行畫面渲染與防呆蓋台檢查，避免誤觸發
+                            // ✨ 5. 身分與專案全部就緒後，才刷新渲染與執行雲端明細下載，完美防止蓋台衝突
+                            updateHeaderTitle();
                             renderAll();
                             if (currentTripId) {
-                                forceSyncDownload();
+                                await forceSyncDownload();
                             }
                         }
                     });
