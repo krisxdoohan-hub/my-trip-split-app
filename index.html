@@ -1533,9 +1533,9 @@
             const dbBlock = document.getElementById('setting-block-database');
             if (dbBlock) dbBlock.style.display = isOwner ? 'block' : 'none';
             
-            // 旅程專案設定 (Trip ID)：如果是主揪才看得到。一般成員已經在旅程內，不允許隨意切換專案
+            // 旅程專案設定 (Trip ID)：為了支援「自助加入(方案 B)」，必須開放給所有人看見
             const tripBlock = document.getElementById('setting-block-trip');
-            if (tripBlock) tripBlock.style.display = isOwner ? 'block' : 'none';
+            if (tripBlock) tripBlock.style.display = 'block';
             
             // ✨ [權限精確修復] 本機身分綁定：主揪始終可見以利調度；一般成員「尚未綁定」才看得到。一旦綁定完成，此區塊直接完全隱藏，徹底杜絕亂改綁！
             const idBlock = document.getElementById('setting-block-identity');
