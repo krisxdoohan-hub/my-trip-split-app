@@ -7,6 +7,63 @@
     <link rel="manifest" href="./manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+        import {
+            getFirestore,
+            doc,
+            getDoc,
+            setDoc,
+            updateDoc,
+            deleteDoc,
+            collection,
+            getDocs,
+            addDoc,
+            query,
+            where,
+            orderBy,
+            serverTimestamp,
+            writeBatch
+        } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCMnkg7Ei1kqHZgcSc1jlvhnBCscOlNhkM",
+            authDomain: "my-trip-split-app.firebaseapp.com",
+            projectId: "my-trip-split-app",
+            storageBucket: "my-trip-split-app.firebasestorage.app",
+            messagingSenderId: "348152451240",
+            appId: "1:348152451240:web:93c5d0feb79812f236f29d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 將模組暴露給全域環境，以供 Vanilla JS 存取
+        window.firebaseAuth = auth;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.onAuthStateChanged = onAuthStateChanged;
+
+        // ✨ [新增] 暴露 Firestore 實例與所有常用操作函數至全域 ✨
+        window.db = db;
+        window.fsDoc = doc;
+        window.fsGetDoc = getDoc;
+        window.fsSetDoc = setDoc;
+        window.fsUpdateDoc = updateDoc;
+        window.fsDeleteDoc = deleteDoc;
+        window.fsCollection = collection;
+        window.fsGetDocs = getDocs;
+        window.fsAddDoc = addDoc;
+        window.fsQuery = query;
+        window.fsWhere = where;
+        window.fsOrderBy = orderBy;
+        window.fsServerTimestamp = serverTimestamp;
+        window.fsWriteBatch = writeBatch;
+    </script>
+
     <style>
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -36,31 +93,21 @@
                     <i class="ph ph-lock-key text-4xl text-indigo-300"></i>
                 </div>
                 <h2 class="text-2xl font-black tracking-widest text-white">私人記帳簿</h2>
-                <p class="text-xs text-indigo-200 font-medium opacity-60">請輸入解鎖密碼</p>
+                <p class="text-xs text-indigo-200 font-medium opacity-60">請登入雲端帳號以同步資料</p>
             </div>
             
-            <div class="flex justify-center gap-4 py-4" id="pass-dots">
-                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
-                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
-                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
-                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
-                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
-                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4 px-4">
-                <button onclick="inputPass('1')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">1</button>
-                <button onclick="inputPass('2')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">2</button>
-                <button onclick="inputPass('3')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">3</button>
-                <button onclick="inputPass('4')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">4</button>
-                <button onclick="inputPass('5')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">5</button>
-                <button onclick="inputPass('6')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">6</button>
-                <button onclick="inputPass('7')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">7</button>
-                <button onclick="inputPass('8')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">8</button>
-                <button onclick="inputPass('9')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">9</button>
-                <div class="h-16"></div>
-                <button onclick="inputPass('0')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">0</button>
-                <button onclick="clearPass()" class="h-16 rounded-full text-red-300 font-bold active:scale-95 text-sm uppercase">清除</button>
+            <div class="flex flex-col gap-4 px-4 w-full max-w-[280px] mx-auto mt-6">
+                <input type="email" id="fb-email" placeholder="信箱" class="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white placeholder-indigo-200/50 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <input type="password" id="fb-password" placeholder="密碼" class="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white placeholder-indigo-200/50 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <div class="flex gap-3 mt-2">
+                    <button onclick="handleFirebaseLogin()" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition duration-200 shadow-md active:scale-95 focus:outline-none">
+                        登入
+                    </button>
+                    <button onclick="handleFirebaseRegister()" class="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 rounded-xl transition duration-200 shadow-md active:scale-95 focus:outline-none">
+                        註冊
+                    </button>
+                </div>
+                <p id="fb-error-msg" class="text-rose-400 text-xs text-center h-4 font-bold opacity-0 transition-opacity"></p>
             </div>
         </div>
     </div>
@@ -88,9 +135,12 @@
     </div>
 
     <header class="bg-white px-4 py-3 shadow-sm z-30 flex justify-between items-center flex-shrink-0">
-        <div class="flex items-center gap-2 text-indigo-700">
-            <i class="ph ph-wallet text-2xl"></i>
-            <span class="font-bold tracking-widest">家計總覽</span>
+        <div onclick="openDashboard()" class="flex items-center gap-2 text-indigo-700 cursor-pointer hover:bg-indigo-50 px-2 py-1 -ml-2 rounded-xl transition-colors active:scale-95 group">
+            <i class="ph ph-wallet text-2xl group-active:scale-90 transition-transform"></i>
+            <div class="flex flex-col">
+                <span class="font-black tracking-widest text-sm text-gray-800" id="header-trip-title">家計總覽</span>
+                <span class="text-[10px] font-bold text-indigo-500 flex items-center gap-0.5">切換旅程 <i class="ph ph-caret-down"></i></span>
+            </div>
         </div>
         <div class="flex items-center gap-3">
             <button onclick="openSettlement()" class="text-indigo-500 hover:text-indigo-700 transition-colors p-1.5 rounded-full hover:bg-indigo-50 focus:outline-none" title="計算分帳結果">
@@ -165,7 +215,7 @@
         </div>
     </main>
 
-    <button onclick="openAddModal()" class="fixed bottom-6 right-6 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-transform z-40 focus:outline-none">
+    <button id="fab-add-record" onclick="openAddModal()" class="fixed bottom-6 right-6 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-transform z-40 focus:outline-none">
         <i class="ph ph-plus text-2xl"></i>
     </button>
 
@@ -229,6 +279,19 @@
                     <div>
                         <input type="text" id="input-note" placeholder="輸入備註 (選填)" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm text-gray-700">
                     </div>
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200 flex items-center gap-3">
+                        <button type="button" onclick="document.getElementById('input-receipt').click()" class="flex-shrink-0 bg-white border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-100 active:scale-95 transition flex items-center gap-1 focus:outline-none">
+                            <i class="ph ph-camera text-lg"></i> 附加憑證
+                        </button>
+                        <input type="file" id="input-receipt" accept="image/*" class="hidden" onchange="handleReceiptUpload(event)">
+                        <div id="receipt-preview-container" class="hidden flex-1 items-center justify-between">
+                            <div class="flex items-center gap-2 overflow-hidden">
+                                <img id="receipt-preview" src="" class="h-10 w-10 object-cover rounded shadow-sm border border-gray-200">
+                                <span id="receipt-name" class="text-[10px] text-gray-500 truncate max-w-[80px]">已壓縮準備上傳</span>
+                            </div>
+                            <button type="button" onclick="clearReceipt()" class="text-red-400 hover:text-red-600 focus:outline-none p-1"><i class="ph ph-x-circle text-xl"></i></button>
+                        </div>
+                    </div>
                     <div class="flex gap-2">
                         <select id="input-currency" class="w-1/3 border-gray-200 rounded-xl p-3 bg-indigo-50/50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-indigo-700">
                             <option value="TWD">TWD</option><option value="JPY">JPY</option><option value="USD">USD</option><option value="EUR">EUR</option>
@@ -254,6 +317,15 @@
             <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
                 <h3 id="settlementTitle" class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-calculator text-indigo-600 text-xl"></i> 旅程結算報告</h3>
                 <div class="flex gap-2">
+                    <button id="btn-destroy-trip" onclick="destroyTripPermanently()" class="hidden p-2 bg-gray-900 text-red-500 rounded-full hover:bg-black active:scale-95 transition-all focus:outline-none shadow-md border border-red-900" title="終極銷毀專案(主揪限定)">
+                        <i class="ph ph-skull text-lg"></i>
+                    </button>
+                    <button id="btn-close-trip-perm" onclick="closeTripPermanently()" class="hidden p-2 bg-red-600 text-white rounded-full hover:bg-red-700 active:scale-95 transition-all focus:outline-none" title="永久關閉旅程(主揪限定)">
+                        <i class="ph ph-lock-key-fill text-lg"></i>
+                    </button>
+                    <button id="btn-lock-trip" onclick="lockCurrentTrip()" class="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 active:scale-95 transition-all focus:outline-none" title="強制關帳並鎖定全專案">
+                        <i class="ph ph-lock-key text-lg"></i>
+                    </button>
                     <button onclick="shareSettlement()" class="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 active:scale-95 transition-all focus:outline-none" title="一鍵推播報表">
                         <i class="ph ph-share-network text-lg"></i>
                     </button>
@@ -280,17 +352,7 @@
             </div>
             
             <div class="p-6 overflow-y-auto flex-1 space-y-6">
-                <div class="bg-purple-50 rounded-2xl border border-purple-100 p-4" id="setting-block-database">
-                    <h4 class="font-bold text-purple-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-database text-purple-500 text-lg"></i> 專屬資料庫綁定 (API URL)</h4>
-                    <div class="space-y-3">
-                        <p class="text-[10px] text-purple-700 leading-tight">貼上您專屬的 Google Apps Script API 網址，即可獨立運作您的資料庫。</p>
-                        <input type="text" id="cfg-api-url" placeholder="https://script.google.com/macros/s/..." class="w-full border-purple-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none font-bold text-gray-800 tracking-wider">
-                        <button onclick="saveApiUrl()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg active:scale-95 transition text-sm shadow-sm shadow-purple-200 focus:outline-none flex justify-center items-center gap-2">
-                            <i class="ph ph-link"></i> 綁定資料庫
-                        </button>
-                    </div>
-                </div>
-
+                
                 <div class="bg-emerald-50/50 rounded-2xl border border-emerald-100 p-4" id="setting-block-trip">
                     <div class="flex justify-between items-center mb-3">
                         <h4 class="font-bold text-emerald-900 text-sm flex items-center gap-2"><i class="ph ph-airplane-tilt text-emerald-500 text-lg"></i> 旅程專案設定 (Trip ID)</h4>
@@ -298,9 +360,15 @@
                     <div class="space-y-3">
                         <p class="text-[10px] text-emerald-700 leading-tight">切換代碼即可自動重置畫面並同步對應的雲端帳本。</p>
                         <input type="text" id="cfg-trip-id" placeholder="例如：Fukuoka_2026" class="w-full border-emerald-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none font-bold text-gray-800 tracking-wider">
-                        <button onclick="saveTripId()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg active:scale-95 transition text-sm shadow-sm shadow-emerald-200 focus:outline-none flex justify-center items-center gap-2">
-                            <i class="ph ph-arrows-clockwise"></i> 切換 / 建立旅程
-                        </button>
+                        <input type="password" id="cfg-invite-code" placeholder="請輸入 6 碼旅程邀請碼" class="w-full border-emerald-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none font-bold text-gray-800 tracking-wider mt-2">
+                        <div class="flex gap-2">
+                            <button onclick="saveTripId()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg active:scale-95 transition text-sm shadow-sm shadow-emerald-200 focus:outline-none flex justify-center items-center gap-2">
+                                <i class="ph ph-arrows-clockwise"></i> 切換 / 建立
+                            </button>
+                            <button onclick="generateDeepLink()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold px-4 rounded-lg active:scale-95 transition text-sm shadow-sm border border-indigo-200 focus:outline-none" title="產生並複製一鍵邀請連結">
+                                <i class="ph ph-link text-lg"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -317,6 +385,16 @@
                     </div>
                 </div>
 
+                <div class="bg-teal-50 rounded-2xl border border-teal-100 p-4" id="setting-block-nickname" style="display: none;">
+                    <h4 class="font-bold text-teal-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-user-circle-gear text-teal-500 text-lg"></i> 修改專屬暱稱</h4>
+                    <div class="space-y-3">
+                        <div class="flex gap-2">
+                            <input type="text" id="input-my-nickname" placeholder="輸入新暱稱" class="flex-1 border-teal-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-400 focus:outline-none shadow-sm">
+                            <button onclick="updateMyNickname()" class="bg-teal-500 hover:bg-teal-600 text-white font-bold px-4 py-2 rounded-lg active:scale-95 transition text-xs shadow-sm focus:outline-none">更名</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-rose-50 rounded-2xl border border-rose-100 p-4" id="setting-block-members">
                     <h4 class="font-bold text-rose-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-users-three text-rose-500 text-lg"></i> 旅程成員管理</h4>
                     <div class="flex gap-2 mb-3">
@@ -327,48 +405,137 @@
                         </div>
                 </div>
 
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-4" id="setting-block-json">
-                    <h4 class="font-bold text-gray-700 text-sm flex items-center gap-2 mb-3"><i class="ph ph-hard-drives text-gray-500 text-lg"></i> 本機手動 JSON</h4>
-                    <div class="flex gap-2">
-                        <button onclick="exportData()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs flex justify-center items-center gap-1 focus:outline-none">
-                            <i class="ph ph-export"></i> 匯出備份
-                        </button>
-                        <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)">
-                        <button onclick="document.getElementById('import-file').click()" class="flex-1 bg-white hover:bg-gray-100 text-gray-700 font-bold border border-gray-200 py-2 rounded-lg active:scale-95 transition text-xs flex justify-center items-center gap-1 focus:outline-none">
-                            <i class="ph ph-download-simple"></i> 匯入還原
-                        </button>
-                    </div>
-                </div>
-
-                <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-4" id="setting-block-security">
-                    <h4 class="font-bold text-indigo-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-shield-check text-indigo-500 text-lg"></i> 安全鎖定設定</h4>
-                    <div class="space-y-3">
-                        <div class="flex gap-2">
-                            <input type="password" id="input-new-pass-admin" maxlength="6" placeholder="新 6 位數管理者密碼" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
-                            <button onclick="changetripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPassword('admin')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
-                                修改主管
-                            </button>
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="password" id="input-new-pass-guest" maxlength="6" placeholder="新 6 位數訪客密碼" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
-                            <button onclick="changetripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPassword('guest')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">
-                                修改訪客
-                            </button>
-                        </div>
-                        <p class="text-[10px] text-gray-400 leading-tight">下次開啟 APP 或從後台切換回前台時生效。</p>
-                    </div>
-                </div>
-            
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.7 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.8 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
 
+    <div id="dashboardModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300 flex flex-col max-h-[85vh]" id="dashboardContent">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0 bg-indigo-50/50 rounded-t-[32px] sm:rounded-t-[24px]">
+                <h3 class="text-lg font-black text-indigo-900 flex items-center gap-2"><i class="ph ph-plugs-connected text-indigo-600 text-xl"></i> 我的旅程專案</h3>
+                <button onclick="closeDashboard()" class="p-2 bg-white text-gray-500 rounded-full hover:bg-gray-100 border border-gray-200 active:scale-95 transition-all focus:outline-none">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 space-y-3 bg-gray-50/50" id="dashboard-trip-list">
+                </div>
+            <div class="p-4 bg-white border-t border-gray-100 rounded-b-[24px]">
+                <button onclick="closeDashboard(); openSettings();" class="w-full bg-white hover:bg-gray-50 text-indigo-600 border border-indigo-200 font-bold py-3 rounded-xl active:scale-95 transition duration-200 shadow-sm focus:outline-none flex justify-center items-center gap-2 text-sm">
+                    <i class="ph ph-plus-circle text-lg"></i> 加入或建立新旅程
+                </button>
+            </div>
+        </div>
+    </div>
+
+        </div>
+    </div>
+
+    <div id="archiveSuccessModal" class="fixed inset-0 bg-indigo-950/80 backdrop-blur-md z-[300] hidden flex-col justify-center items-center p-6 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full max-w-sm rounded-[32px] shadow-2xl transform scale-95 transition-transform duration-300 flex flex-col p-8 text-center" id="archiveSuccessContent">
+            <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-indigo-100">
+                <i class="ph ph-confetti text-5xl text-indigo-500"></i>
+            </div>
+            <h3 class="text-2xl font-black text-gray-800 mb-3 tracking-wide">🎉 結算完成！</h3>
+            <p class="text-sm font-medium text-gray-500 mb-8 leading-relaxed">此專案已安全封存，所有帳目將轉為唯讀狀態。<br>您接下來想做什麼呢？</p>
+
+            <div class="flex flex-col gap-4 w-full">
+                <button onclick="returnToDashboardAfterArchive()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl transition duration-200 shadow-lg shadow-indigo-200 active:scale-95 text-lg flex justify-center items-center gap-2 focus:outline-none">
+                    <i class="ph ph-plugs-connected text-2xl"></i> 返回旅程總覽
+                </button>
+                <button onclick="createNewTripAfterArchive()" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-black py-4 rounded-2xl transition duration-200 active:scale-95 text-lg flex justify-center items-center gap-2 focus:outline-none">
+                    <i class="ph ph-plus-circle text-2xl"></i> 建立新旅程
+                </button>
+            </div>
+        </div>
+    </div>
+
+    
     <script>
+
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }
+
+        // ✨ [新增] 網址深層連結 (Deep Linking) 攔截機制 ✨
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTripId = urlParams.get('tripId');
+        const urlInviteCode = urlParams.get('invite');
+        if (urlTripId && urlInviteCode) {
+            sessionStorage.setItem('tripSplit_pending_invite', JSON.stringify({ tripId: urlTripId, inviteCode: urlInviteCode }));
+        }
+
+        // ================= IndexedDB 核心封裝 =================
+        let dbInstance = null;
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('TripSplitDB', 1);
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    // 建立帳單明細表
+                    if (!db.objectStoreNames.contains('recordsStore')) {
+                        db.createObjectStore('recordsStore', { keyPath: 'id' });
+                    }
+                    // 建立離線同步佇列表
+                    if (!db.objectStoreNames.contains('queueStore')) {
+                        db.createObjectStore('queueStore', { keyPath: 'id' });
+                    }
+                };
+                
+                request.onsuccess = (event) => {
+                    dbInstance = event.target.result;
+                    resolve(dbInstance);
+                };
+                
+                request.onerror = (event) => {
+                    console.error("IndexedDB 啟動失敗", event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        }
+
+        function dbGetAll(storeName) {
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) return resolve([]);
+                const tx = dbInstance.transaction(storeName, 'readonly');
+                const request = tx.objectStore(storeName).getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbPut(storeName, item) {
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) return reject(new Error("DB not initialized"));
+                const tx = dbInstance.transaction(storeName, 'readwrite');
+                const request = tx.objectStore(storeName).put(item);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbDelete(storeName, id) {
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) return reject(new Error("DB not initialized"));
+                const tx = dbInstance.transaction(storeName, 'readwrite');
+                const request = tx.objectStore(storeName).delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbClear(storeName) {
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) return reject(new Error("DB not initialized"));
+                const tx = dbInstance.transaction(storeName, 'readwrite');
+                const request = tx.objectStore(storeName).clear();
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+        // ====================================================
 
         let records = []; 
         let currentViewDate = new Date(); 
@@ -377,7 +544,8 @@
         let editingRecordId = null;
         let currentModalRecordType = 'expense';
         let hasUnsyncedChanges = false; // ✨ [新增] 離線變更防丟失旗標 ✨
-        let syncQueue = JSON.parse(localStorage.getItem('tripSplit_syncQueue')) || []; // ✨ [新增] 本機同步佇列 ✨
+        let syncQueue = []; // ✨ [修改] 移除非同步 localStorage 讀取，改為空陣列等待 IndexedDB 載入 ✨
+        let currentReceiptBase64 = null; // ✨ [新增] 暫存壓縮後的圖片 Base64 ✨
         
         // --- 密碼變數 ---
         let tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass = localStorage.getItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass') || "000000"; // 初始管理者密碼 000000
@@ -387,9 +555,10 @@
         
         // ✨ [修改] 替換為旅程代碼與 GAS API 網址 ✨
         let currentTripId = localStorage.getItem('tripSplit_tripId') || "";
+        let currentInviteCode = localStorage.getItem('tripSplit_inviteCode') || ""; // ✨ [新增] 邀請碼變數 ✨
         let myIdentity = localStorage.getItem('tripSplit_myIdentity') || ""; // ✨ [新增] 身分綁定變數 ✨
-        // ✨ [修改] 將後端 API 改為動態讀取本機儲存空間，若無則預設為開發者公用庫 ✨
-        let gasApiUrl = localStorage.getItem('tripSplit_gasApiUrl') || "https://script.google.com/macros/s/AKfycbzFzKfgIEWxZvcgvPZt-IkNsbd98eyPvwCgpQL4KVDj_IrCSVACq6wvAZDm-aR93vg/exec";
+        // ✨ [修改] 強制寫死最新的 GAS 網址，徹底排除本機舊快取的干擾 ✨
+        let gasApiUrl = "https://script.google.com/macros/s/AKfycbznfBaBDPs0q9aN9q-Egg00xk1IZv6eJwpZBXkQRHeK_88yenbGGQuvFedOUg9Qfy_neg/exec";
         
         
         // ✨ [新增] 動態旅遊成員名單與 UI 渲染函數 ✨
@@ -564,18 +733,31 @@
 
         async function init() {
             // 開啟時重設輸入狀態
-            clearPass();
+            //clearPass();
             
             // ✨ [修改] 替換為載入新的旅程代碼設定 ✨
             loadTripConfig();
             
-            const saved = localStorage.getItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords');
-            if (saved) { 
-                records = JSON.parse(saved); 
-                records.forEach(r => { 
-                    if(!r.currency) r.currency = 'TWD'; 
-                    if(!r.type) r.type = 'expense'; 
-                }); 
+            // ✨ [修改] 啟動 IndexedDB 並以非同步方式讀取本地帳本與佇列 ✨
+            try {
+                await initDB();
+                
+                const savedRecords = await dbGetAll('recordsStore');
+                if (savedRecords && savedRecords.length > 0) {
+                    records = savedRecords;
+                    records.forEach(r => { 
+                        if(!r.currency) r.currency = 'TWD'; 
+                        if(!r.type) r.type = 'expense'; 
+                    });
+                }
+                
+                const savedQueue = await dbGetAll('queueStore');
+                if (savedQueue && savedQueue.length > 0) {
+                    syncQueue = savedQueue;
+                    hasUnsyncedChanges = true;
+                }
+            } catch (error) {
+                console.error("本地資料庫載入失敗:", error);
             }
             
             const used = [...new Set(records.map(r => r.currency))];
@@ -595,6 +777,7 @@
             
             // ✨ [新增] 網路恢復連線時，立刻觸發背景佇列處理 ✨
             window.addEventListener('online', processSyncQueue);
+            updateHeaderTitle(); // 初始化時更新頂部標題
         }
 
         function renderAll() {
@@ -602,6 +785,18 @@
             renderCurrencyDashboard();
             renderAnalytics();
             renderHistory();
+            
+            // ✨ [新增] 依據專案封存狀態，動態隱藏/顯示新增紀錄按鈕 ✨
+            const fab = document.getElementById('fab-add-record');
+            if (fab) {
+                if (window.currentTripIsClosed) {
+                    fab.classList.add('hidden');
+                    fab.classList.remove('flex');
+                } else {
+                    fab.classList.remove('hidden');
+                    fab.classList.add('flex');
+                }
+            }
         }
 
         function renderHeader() {
@@ -614,6 +809,15 @@
             const btn = document.getElementById('backTodayBtn');
             if(y === today.getFullYear() && m === today.getMonth() + 1) btn.classList.add('hidden');
             else btn.classList.remove('hidden');
+
+            // ✨ [新增] 智慧防護：一般親友綁定完成後，自動隱藏頂部標頭的「切換旅程」提示字眼 ✨
+            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
+            const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
+            const isSetupComplete = (currentTripId !== "" && myIdentity !== "");
+            const caretEl = document.querySelector('#header-trip-title') ? document.querySelector('#header-trip-title').nextElementSibling : null;
+            if (caretEl) {
+                caretEl.style.display = (isSetupComplete && !isOwner) ? 'none' : 'flex';
+            }
         }
 
         function changeMonth(delta) { currentViewDate.setMonth(currentViewDate.getMonth() + delta); renderAll(); }
@@ -746,6 +950,12 @@
             targetRecords.forEach(r => { if(!grouped[r.date]) grouped[r.date] = []; grouped[r.date].push(r); });
             const sortedDates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
             
+            // ✨ [新增] 建立 UUID 與真實姓名的對照翻譯字典 ✨
+            const memberMap = new Map();
+            members.forEach(m => {
+                memberMap.set(m.id || m, m.name || m);
+            });
+            
             let html = '';
             sortedDates.forEach(date => {
                 const dayStr = date.substring(8, 10);
@@ -757,26 +967,34 @@
                     const iconColor = r.type === 'expense' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500';
                     const iconPh = r.type === 'expense' ? 'ph-trend-down' : 'ph-trend-up';
                     
-                    // ✨ [修改] 旅遊分帳專屬：顯示付款人與分攤對象 ✨
+                    // ✨ [修改] 顯示付款人與分攤對象，並將 UUID 轉譯為真實中文姓名 ✨
                     let accBadge = '';
+                    let rawPayer = r.payer || '公費';
+                    let payerText = memberMap.get(rawPayer) || rawPayer; // 若找不到翻譯則顯示原值防呆
+                    
                     if (r.type === 'expense') {
                         // 處理付款人標籤
-                        let payerText = r.payer || '公費';
-                        let payerColor = payerText === '公費' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                        let payerColor = rawPayer === '公費' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
                         accBadge = `<span class="inline-block ${payerColor} border px-1.5 py-0.5 rounded text-[9px] font-bold ml-2 shadow-sm">付: ${payerText}</span>`;
                         
                         // 處理分攤對象標籤
                         if (r.participants) {
-                            // ✨ [修復3] 強制轉型為字串，防止純數字造成 split 報錯使清單渲染崩潰 ✨
-                            let partsArray = String(r.participants).split(',');
-                            let partsText = partsArray.length >= 3 ? '全體' : partsArray.join(',');
+                            let partsArray = String(r.participants).split(',').filter(Boolean);
+                            // 將所有分攤者的 UUID 查字典翻譯為姓名
+                            let translatedParts = partsArray.map(pId => memberMap.get(pId) || pId);
+                            let partsText = translatedParts.length >= 3 ? '全體' : translatedParts.join(',');
                             accBadge += `<span class="inline-block bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 shadow-sm">分: ${partsText}</span>`;
                         }
+                    } else if (r.type === 'income' && rawPayer !== '公費' && rawPayer !== '系統入帳') {
+                        // ✨ [新增] 收入情境：顯示繳交公費的真實姓名標籤 ✨
+                        accBadge = `<span class="inline-block bg-teal-50 text-teal-600 border border-teal-200 px-1.5 py-0.5 rounded text-[9px] font-bold ml-2 shadow-sm">交: ${payerText}</span>`;
                     }
 
                     // ✨ [新增] 判斷是否上鎖，加入鎖定視覺效果 ✨
                     const lockIcon = r.is_locked ? '<i class="ph ph-lock text-gray-400 ml-1" title="已結算關帳"></i>' : '';
                     const opacityClass = r.is_locked ? 'opacity-60' : '';
+                    // ✨ [新增] 判斷是否有附加憑證圖片 ✨
+                    const receiptIcon = (r.receipt_image || r.receipt_url) ? '<i class="ph ph-image text-indigo-400 ml-1" title="附有憑證圖片"></i>' : '';
 
                     html += `
                     <div onclick="editRecord('${r.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors group ${opacityClass}">
@@ -785,7 +1003,7 @@
                                 <i class="ph ${iconPh} text-lg"></i>
                             </div>
                             <div>
-                                <p class="text-sm font-bold text-gray-800 mb-0.5 flex items-center">${r.category} ${accBadge} ${lockIcon}</p>
+                                <p class="text-sm font-bold text-gray-800 mb-0.5 flex items-center">${r.category} ${accBadge} ${lockIcon} ${receiptIcon}</p>
                                 <p class="text-xs font-medium text-gray-400 truncate max-w-[150px]">${r.note}</p>
                             </div>
                         </div>
@@ -806,6 +1024,7 @@
             document.getElementById('input-amount').value = '';
             document.getElementById('input-note').value = '';
             document.getElementById('input-currency').value = currentCurrency;
+            clearReceipt(); // ✨ [新增] 開啟表單時清除上一次的憑證暫存 ✨
             setRecordType(filterType); 
             
             // ✨ [新增] 每次開啟表單時，自動依據變數刷新成員名單 UI ✨
@@ -849,6 +1068,41 @@
             document.getElementById('input-currency').value = r.currency;
             setRecordType(r.type || 'expense');
             
+            // ✨ [修正] 讀取並顯示雲端的憑證圖片，確保轉為可顯示的視圖網址 ✨
+            clearReceipt();
+            
+            const previewImg = document.getElementById('receipt-preview');
+            previewImg.onclick = null; // 重置點擊事件
+            previewImg.classList.remove('cursor-pointer');
+            previewImg.title = "";
+
+            if (r.receipt_image) {
+                // ✨ [新增] 優先顯示本機或快取的 Base64 圖片 ✨
+                currentReceiptBase64 = r.receipt_image;
+                previewImg.src = currentReceiptBase64;
+                document.getElementById('receipt-name').innerText = "已載入本機憑證";
+                document.getElementById('receipt-preview-container').classList.remove('hidden');
+                document.getElementById('receipt-preview-container').classList.add('flex');
+            } else if (r.receipt_url) {
+                // ✨ [修改] 轉換為 Thumbnail API 解決破圖，並加入點擊另開視窗功能 ✨
+                let viewUrl = r.receipt_url;
+                if (viewUrl.includes('/file/d/')) {
+                    const fileId = viewUrl.split('/d/')[1].split('/')[0];
+                    // 使用 thumbnail API 取得縮圖，避免跨網域 403 錯誤
+                    viewUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
+                }
+                previewImg.src = viewUrl;
+                
+                // 綁定點擊事件，讓使用者另開分頁查看原始大小的憑證
+                previewImg.onclick = () => window.open(r.receipt_url, '_blank');
+                previewImg.classList.add('cursor-pointer');
+                previewImg.title = "點擊開啟完整圖片";
+
+                document.getElementById('receipt-name').innerText = "已從雲端載入憑證";
+                document.getElementById('receipt-preview-container').classList.remove('hidden');
+                document.getElementById('receipt-preview-container').classList.add('flex');
+            }
+            
             // ✨ [修改] 載入旅遊分帳的付款人與分攤對象 (支援歷史人員防呆) ✨
             let historicalParts = [];
             if(r.participants) historicalParts = r.participants.split(',');
@@ -876,6 +1130,50 @@
             m.classList.add('opacity-0'); c.classList.add('translate-y-full');
             setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
         }
+
+        // ================= 圖片壓縮與預覽邏輯 =================
+        function handleReceiptUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1600; // 提升最大寬度限制，保留單據與截圖細節
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 提升輸出品質至 0.85，兼顧畫質與上傳效能
+                    currentReceiptBase64 = canvas.toDataURL('image/jpeg', 0.85);
+                    
+                    document.getElementById('receipt-preview').src = currentReceiptBase64;
+                    document.getElementById('receipt-preview-container').classList.remove('hidden');
+                    document.getElementById('receipt-preview-container').classList.add('flex');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearReceipt() {
+            currentReceiptBase64 = null;
+            document.getElementById('input-receipt').value = '';
+            document.getElementById('receipt-preview-container').classList.add('hidden');
+            document.getElementById('receipt-preview-container').classList.remove('flex');
+        }
+        // ====================================================
 
         // ✨ [新增] 消費日期變更時，即時動態連動防呆過濾分攤名單 ✨
         function onRecordDateChange() {
@@ -926,68 +1224,81 @@
             }
         }
 
-        // ================= 同步佇列管理系統 =================
+       // ================= Firestore 同步系統 =================
+
+        // ✨ [新增] Firestore 底層寫入函數：將單筆 record 寫入 trips/{tripId}/transactions/{id} ✨
+        async function firestoreWriteRecord(record) {
+            if (!window.db || !currentTripId) throw new Error("Firestore 或 tripId 尚未就緒");
+            const cleanRecord = { ...record };
+            // Base64 圖片不存 Firestore（後續 Stage 4 改由 Firebase Storage 處理）
+            delete cleanRecord.receipt_image;
+            cleanRecord.updatedAt = window.fsServerTimestamp();
+            const docRef = window.fsDoc(window.db, 'trips', currentTripId, 'transactions', String(record.id));
+            await window.fsSetDoc(docRef, cleanRecord, { merge: true });
+        }
+
+        // ✨ [新增] Firestore 底層刪除函數：從 trips/{tripId}/transactions/{id} 移除文件 ✨
+        async function firestoreDeleteRecord(recordId) {
+            if (!window.db || !currentTripId) throw new Error("Firestore 或 tripId 尚未就緒");
+            const docRef = window.fsDoc(window.db, 'trips', currentTripId, 'transactions', String(recordId));
+            await window.fsDeleteDoc(docRef);
+        }
+
+        // ✨ [修改] 離線佇列處理器：改為對 Firestore 批次補送，取代原本的 GAS fetch ✨
         async function processSyncQueue() {
-            if (syncQueue.length === 0 || !navigator.onLine) return;
-            
-            showSettingsMsg("正在背景處理離線同步佇列...");
+            if (syncQueue.length === 0 || !navigator.onLine || !window.db) return;
+
+            showSettingsMsg("正在背景批次上傳離線資料...");
             updateCloudIcon('unsynced');
-            
-            let isQueueProcessed = true;
-            // 複製一份佇列來處理，避免迴圈中發生競態條件
+
+            // 複製一份佇列來處理，避免競態條件
             const currentQueue = [...syncQueue];
-            
-            for (let i = 0; i < currentQueue.length; i++) {
-                const item = currentQueue[i];
+            const successIds = [];
+
+            for (const queueItem of currentQueue) {
                 try {
-                    const res = await fetch(gasApiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify(item.payload)
-                    });
-                    const result = await res.json();
-                    
-                    if (result.status === 'success') {
-                        // 成功後將該項目從主佇列中精準剔除
-                        syncQueue = syncQueue.filter(q => q.id !== item.id);
-                        localStorage.setItem('tripSplit_syncQueue', JSON.stringify(syncQueue));
-                    } else if (result.status === 'conflict') {
-                        // ✨ [新增] 發生版本衝突：代表此帳單已被他人覆蓋 ✨
-                        console.error("發生版本衝突，放棄本機覆蓋:", item.payload);
-                        alert("⚠️ 發現資料版本衝突！\\n這筆帳單剛剛已被其他人修改。\\n系統將放棄您的變更，並自動下載最新資料。");
-                        syncQueue = syncQueue.filter(q => q.id !== item.id); // 丟棄過期請求
-                        localStorage.setItem('tripSplit_syncQueue', JSON.stringify(syncQueue));
-                        forceSyncDownload(); // 強制下載最新版本
+                    const p = queueItem.payload;
+                    if (p.action === 'delete') {
+                        await firestoreDeleteRecord(p.id);
                     } else {
-                        console.error("佇列項目處理失敗:", result.message);
-                        isQueueProcessed = false;
-                        break; // 確保稽核日誌順序正確，若有一筆失敗則中斷後續上傳
+                        await firestoreWriteRecord(p);
                     }
-                } catch (error) {
-                    console.error("佇列連線異常:", error);
-                    isQueueProcessed = false;
-                    break;
+                    successIds.push(queueItem.id);
+                } catch (err) {
+                    console.error("佇列項目處理失敗，稍後重試:", err);
+                    // 單筆失敗不中斷，繼續處理下一筆
                 }
             }
-            
+
+            // 精準清除已成功處理的項目
+            for (const sid of successIds) {
+                syncQueue = syncQueue.filter(q => q.id !== sid);
+                await dbDelete('queueStore', sid);
+            }
+
             if (syncQueue.length === 0) {
                 hasUnsyncedChanges = false;
                 updateCloudIcon('success');
-                showSettingsMsg("離線資料已全數同步至雲端！");
+                showSettingsMsg("離線資料已批次同步至 Firestore！");
             } else {
                 updateCloudIcon('error');
+                showSettingsMsg(`仍有 ${syncQueue.length} 筆資料待同步`, false);
             }
         }
-        
-        // 將 API 請求打包放入排隊區
-        function enqueueSyncItem(payload) {
-            const queueItem = { id: Date.now().toString() + Math.random().toString(36).substring(2, 6), payload: payload };
+
+        // ✨ [修改] 離線佇列入列函數：移除 GAS inviteCode 附加，保留 IndexedDB 離線儲存邏輯 ✨
+        async function enqueueSyncItem(payload) {
+            const queueItem = {
+                id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+                payload: payload
+            };
             syncQueue.push(queueItem);
-            localStorage.setItem('tripSplit_syncQueue', JSON.stringify(syncQueue));
-            
+            await dbPut('queueStore', queueItem);
+
             hasUnsyncedChanges = true;
             updateCloudIcon('unsynced');
-            
-            // 嘗試立即執行處理 (若在線則秒發，若離線則留待事件觸發)
+
+            // 若在線則立刻觸發處理，若離線則留待 online 事件
             if (navigator.onLine) {
                 processSyncQueue();
             }
@@ -1036,6 +1347,75 @@
             const existingRecord = editingRecordId ? records.find(r => String(r.id) === String(editingRecordId)) : null;
             const currentRev = existingRecord && existingRecord.rev ? existingRecord.rev : 1;
 
+            // ─── ✨ [新增] 動態產生活躍成員快照 (Active Member Snapshot) ✨ ───
+            let snapshotList = [];
+            const recordDateObj = new Date(d);
+            recordDateObj.setHours(0, 0, 0, 0);
+            
+            // 抓取具有公費資格的成員作為快照母體
+            const basePool = (window.currentPublicPayers && window.currentPublicPayers.length > 0) 
+                ? window.currentPublicPayers 
+                : members.map(m => m.id || m);
+            
+            basePool.forEach(memberId => {
+                let isJoined = true;
+                const memberInfo = (window.memberDetailsList || []).find(info => info.id === memberId || info.name === memberId);
+                
+                if (memberInfo && memberInfo.join_date) {
+                    const cleanJoinDateStr = String(memberInfo.join_date).split(' ')[0].replace(/\//g, '-');
+                    const joinDateObj = new Date(cleanJoinDateStr);
+                    joinDateObj.setHours(0, 0, 0, 0);
+                    // 判斷該帳單日期時，此成員是否已經加入
+                    if (recordDateObj.getTime() < joinDateObj.getTime()) {
+                        isJoined = false;
+                    }
+                }
+                
+                if (isJoined) {
+                    snapshotList.push(memberId);
+                }
+            });
+            
+            // 防呆：若因為極端日期設定導致名單為空，以母體保底避免未來分帳時除以 0 崩潰
+            if (snapshotList.length === 0) snapshotList = basePool;
+            // ─────────────────────────────────────────────────────────────
+
+            // ✨ [新增] 攔截圖片上傳至 Google Drive (GAS) 的非同步流程 ✨
+            let finalReceiptUrl = null;
+            let finalReceiptImage = currentReceiptBase64; // 保留給本機 IndexedDB 快取使用
+
+            // 若有新附上的 Base64 圖片，且目前處於連線狀態，則觸發上傳
+            if (currentReceiptBase64 && navigator.onLine) {
+                // 如果是一張新上傳的圖片 (Data URL 開頭)，而不是舊紀錄編輯的 URL
+                if (currentReceiptBase64.startsWith('data:image')) {
+                    showLoading("上傳圖片至雲端硬碟中...");
+                    try {
+                        const response = await fetch(gasApiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                fileName: `receipt_${recordId}.jpg`,
+                                mimeType: 'image/jpeg',
+                                base64: currentReceiptBase64
+                            })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            finalReceiptUrl = result.url;
+                            finalReceiptImage = null; // 成功取得 URL 後，清空 Base64 以免後續塞爆資料庫
+                        } else {
+                            alert("圖片上傳失敗，將僅保留於本機：" + result.error);
+                        }
+                    } catch (err) {
+                        alert("網路或伺服器錯誤，圖片暫不備份：" + err.message);
+                    }
+                    hideLoading();
+                }
+            } else if (editingRecordId) {
+                // 編輯模式下，若未更換圖片，繼承原本的 url
+                const oldRecord = records.find(r => r.id === editingRecordId);
+                if (oldRecord && oldRecord.receipt_url) finalReceiptUrl = oldRecord.receipt_url;
+            }
+
             const newRecord = { 
                 id: recordId, 
                 trip_id: currentTripId, 
@@ -1048,7 +1428,10 @@
                 total_amount: parseFloat(a), 
                 amount: parseFloat(a), 
                 currency: curr,
-                rev: currentRev // ✨ [新增] 將版本控制號夾帶至資料包中 ✨
+                rev: currentRev, // ✨ [新增] 將版本控制號夾帶至資料包中 ✨
+                member_snapshot: snapshotList, // ✨ [新增] 將快照陣列寫入物件 ✨
+                receipt_image: finalReceiptImage, // 若未上傳成功，短暫保留供本機顯示
+                receipt_url: finalReceiptUrl // ✨ [新增] 存入 Google Drive 產生的真實網址 ✨
             };
 
             if(editingRecordId) {
@@ -1058,85 +1441,51 @@
                 records.push(newRecord);
             }
             
-            localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
+            await dbPut('recordsStore', newRecord); // 本地 IndexedDB 快取
             closeAddModal();
             renderAll();
-       
+
+            // ✨ [修改] 直接寫入 Firestore，離線或失敗時自動降級進佇列 ✨
             updateCloudIcon('unsynced');
-            
-            // ✨ [新增] 透過 fetch API 在背景將 JSON 傳送至 Google API ✨
             try {
-                // ✨ [升級] 建立 Audit Log 稽核日誌結構 ✨
-                let auditLog = null;
-                if (editingRecordId) {
-                    // 若是編輯，抓取舊資料作為比對基準
-                    const oldRecord = records.find(r => r.id === editingRecordId);
-                    auditLog = {
-                        action_type: 'UPDATE',
-                        operator: myIdentity || '未綁定訪客',
-                        target_id: editingRecordId,
-                        before_data: oldRecord,
-                        after_data: newRecord,
-                        timestamp: new Date().toISOString()
-                    };
+                if (navigator.onLine && window.db) {
+                    await firestoreWriteRecord(newRecord);
+                    hasUnsyncedChanges = false;
+                    updateCloudIcon('success');
+                    showSettingsMsg(editingRecordId ? "已更新至 Firestore" : "已新增至 Firestore");
                 } else {
-                    // 若是新增，無舊資料
-                    auditLog = {
-                        action_type: 'INSERT',
-                        operator: myIdentity || '未綁定訪客',
-                        target_id: newRecord.id,
-                        before_data: null,
-                        after_data: newRecord,
-                        timestamp: new Date().toISOString()
-                    };
+                    // 離線：加入佇列，等待網路恢復後補送
+                    await enqueueSyncItem({ ...newRecord, action: 'save' });
                 }
-
-                // 加上 action: 'save' 與 audit_log 標記
-                const payload = { ...newRecord, action: 'save', audit_log: auditLog };
-                
-                // ✨ [修改] 導入 Sync Queue 佇列機制，取代直接發送 fetch ✨
-                enqueueSyncItem(payload);
-
-            } catch(error) {
-                console.error("處理異常:", error);
-                hasUnsyncedChanges = true;
+            } catch (error) {
+                console.error("Firestore 寫入失敗，降級至離線佇列:", error);
+                await enqueueSyncItem({ ...newRecord, action: 'save' });
             }
         }
 
         async function executeDelete() {
-            if(!editingRecordId) return;
+            if (!editingRecordId) return;
             const targetId = editingRecordId;
+
             records = records.filter(r => r.id !== targetId);
-            localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
-            closeAddModal(); 
-            renderAll(); 
-            
+            await dbDelete('recordsStore', targetId); // 本地 IndexedDB 刪除
+            closeAddModal();
+            renderAll();
+
+            // ✨ [修改] 直接從 Firestore 刪除，離線或失敗時自動降級進佇列 ✨
             updateCloudIcon('unsynced');
-
-            // ✨ [新增] 發送刪除指令至 Google API 雲端 ✨
             try {
-                // ✨ [升級] 建立刪除專用的 Audit Log ✨
-                // 注意：必須在 records 被 filter 覆蓋前，先去全域變數或透過 targetId 抓取原始紀錄
-                const oldRecord = JSON.parse(localStorage.getItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords'))?.find(r => r.id === targetId);
-                
-                const auditLog = {
-                    action_type: 'DELETE',
-                    operator: myIdentity || '未綁定訪客',
-                    target_id: targetId,
-                    before_data: oldRecord || { id: targetId, note: '無法取得舊快取' },
-                    after_data: null,
-                    timestamp: new Date().toISOString()
-                };
-
-                // ✨ [新增] 讀取刪除當下的版本號 ✨
-                const currentRev = oldRecord && oldRecord.rev ? oldRecord.rev : 1;
-                const payload = { id: targetId, action: 'delete', rev: currentRev, audit_log: auditLog };
-                
-                // ✨ [修改] 導入 Sync Queue 佇列機制，取代直接發送 fetch ✨
-                enqueueSyncItem(payload);
-
-            } catch(error) {
-                console.error("處理異常:", error);
+                if (navigator.onLine && window.db) {
+                    await firestoreDeleteRecord(targetId);
+                    hasUnsyncedChanges = false;
+                    updateCloudIcon('success');
+                    showSettingsMsg("已從 Firestore 刪除");
+                } else {
+                    await enqueueSyncItem({ id: targetId, action: 'delete' });
+                }
+            } catch (error) {
+                console.error("Firestore 刪除失敗，降級至離線佇列:", error);
+                await enqueueSyncItem({ id: targetId, action: 'delete' });
             }
         }
 
@@ -1150,13 +1499,26 @@
             const isGuest = (currentUserRole === 'guest');
             const isSetupComplete = (currentTripId !== "" && myIdentity !== "");
             
-            // 若為訪客且已設定完畢，就徹底隱藏專案與身分欄位；成員與密碼設定則對訪客永遠隱藏
+            // ✨ [新增] 動態比對當前登入者是否為該旅程的「開團主揪 (Owner)」 ✨
+            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
+            const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
+            
+            // ✨ [修改] 智慧分流鎖定：若是一般親友，綁定後立刻隱藏面板；若是主揪，則不受此防呆限制，永久保留所有管理功能 ✨
             const dbBlock = document.getElementById('setting-block-database');
-            if (dbBlock) dbBlock.style.display = (isGuest && isSetupComplete) ? 'none' : 'block';
-            document.getElementById('setting-block-trip').style.display = (isGuest && isSetupComplete) ? 'none' : 'block';
-            document.getElementById('setting-block-identity').style.display = (isGuest && isSetupComplete) ? 'none' : 'block';
-            document.getElementById('setting-block-members').style.display = isGuest ? 'none' : 'block';
-            document.getElementById('setting-block-security').style.display = isGuest ? 'none' : 'block';
+            if (dbBlock) dbBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            const tripBlock = document.getElementById('setting-block-trip');
+            if (tripBlock) tripBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            const idBlock = document.getElementById('setting-block-identity');
+            if (idBlock) idBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            
+            // ✨ [新增] 獨立的更名區塊顯示邏輯：只要完成綁定，所有人（含親友與主揪）皆可看到更名功能 ✨
+            const nicknameBlock = document.getElementById('setting-block-nickname');
+            if (nicknameBlock) nicknameBlock.style.display = isSetupComplete ? 'block' : 'none';
+
+            const memBlock = document.getElementById('setting-block-members');
+            if (memBlock) memBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            const secBlock = document.getElementById('setting-block-security');
+            if (secBlock) secBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
             
             const m = document.getElementById('settingsModal'), c = document.getElementById('settingsContent');
             m.classList.remove('hidden'); m.classList.add('flex');
@@ -1206,6 +1568,46 @@
             }
         }
 
+        // ✨ [新增] 讓一般成員自主更新名稱至 Firestore 陣列 ✨
+        async function updateMyNickname() {
+            if (!myIdentity) { showSettingsMsg("請先完成上方身分綁定", false); return; }
+            const newName = document.getElementById('input-my-nickname').value.trim();
+            if (!newName) { showSettingsMsg("請輸入新暱稱", false); return; }
+            if (!window.db || !currentTripId) { showSettingsMsg("系統或網路尚未就緒", false); return; }
+
+            showSettingsMsg("正在更新全域暱稱...");
+            updateCloudIcon('unsynced');
+
+            try {
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                if (!tripSnap.exists()) return;
+
+                const tripData = tripSnap.data();
+
+                // 同步替換 members 與 memberDetails 陣列中的顯示名稱
+                const updatedMembers = (tripData.members || []).map(m => {
+                    if ((m.id || m) === myIdentity) return typeof m === 'string' ? { id: myIdentity, name: newName } : { ...m, name: newName };
+                    return m;
+                });
+                const updatedMemberDetails = (tripData.memberDetails || []).map(md => {
+                    if (md.id === myIdentity) return { ...md, name: newName };
+                    return md;
+                });
+
+                await window.fsUpdateDoc(tripRef, { members: updatedMembers, memberDetails: updatedMemberDetails });
+
+                document.getElementById('input-my-nickname').value = '';
+                showSettingsMsg("暱稱修改成功，全團資料已連動更新！");
+                updateCloudIcon('success');
+                forceSyncDownload(); // 觸發重新下載，讓畫面上所有的名字立刻換成新暱稱
+            } catch (error) {
+                console.error("更新暱稱失敗:", error);
+                showSettingsMsg("更新失敗，請檢查網路連線", false);
+                updateCloudIcon('error');
+            }
+        }
+
         // ✨ [新增] 動態渲染活躍成員清單 ✨
         function renderSettingsMembers() {
             const list = document.getElementById('settings-member-list');
@@ -1229,88 +1631,113 @@
             list.innerHTML = html;
         }
 
-        // ✨ [新增] 新增成員並寫入雲端 ✨
-        let isAddingMember = false; // ✨ [新增] 防止連點的非同步防呆鎖
+        // ✨ [修改] 新增成員：改寫為直接更新 Firestore trips/{tripId} 文件 ✨
+        let isAddingMember = false;
         async function addNewMember() {
-            if (isAddingMember) return; // 若正在連線處理中則拒絕執行
+            if (isAddingMember) return;
             const input = document.getElementById('input-new-member');
             const newName = input.value.trim();
             if (!newName) { showSettingsMsg("請輸入姓名", false); return; }
-            
-            // ✨ [修改] 未來 members 會變成物件陣列，這裡需改為比對 name 屬性 ✨
-            // 備註：在完全轉換前，先兼容舊版純字串陣列的檢查方式
-            const isExist = typeof members[0] === 'string' 
-                ? members.includes(newName) 
+
+            const isExist = typeof members[0] === 'string'
+                ? members.includes(newName)
                 : members.some(m => m.name === newName);
-                
             if (isExist) { showSettingsMsg("成員名稱已存在", false); return; }
             if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
+            if (!window.db) { showSettingsMsg("Firestore 尚未就緒", false); return; }
 
-            isAddingMember = true; // 上鎖
-            input.value = ''; // 立即清空輸入框
+            isAddingMember = true;
+            input.value = '';
             showSettingsMsg("正在新增成員...");
             updateCloudIcon('unsynced');
-            
-            // ✨ [新增] 呼叫產生器建立唯一的 member_id ✨
+
             const newMemberId = generateMemberId();
-            
-            // ✨ [單機開發測試用] 階段任務已完成，暫時註解隱藏
-            // console.log("【單機測試 - 準備送出的新成員資料】", {
-            //     action: 'add_member', 
-            //     trip_id: currentTripId, 
-            //     member_id: newMemberId, 
-            //     member_name: newName,
-            //     join_date: getLocalYMD(new Date())
-            // });
-            
+            const joinDate = getLocalYMD(new Date());
+
             try {
-                const res = await fetch(gasApiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ 
-                        action: 'add_member', 
-                        trip_id: currentTripId, 
-                        member_id: newMemberId, // ✨ [新增] 將 UUID 送往後端
-                        member_name: newName,
-                        join_date: getLocalYMD(new Date())
-                    })
-                });
-                const result = await res.json();
-                if(result.status === 'success') {
-                    showSettingsMsg(`${newName} 已成功加入！`);
-                    forceSyncDownload(); // 強制刷新下載新名單
-                } else {
-                    showSettingsMsg("處理失敗", false);
+                // 讀取旅程主文件
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                if (!tripSnap.exists()) {
+                    showSettingsMsg("旅程文件不存在，請先建立旅程", false);
+                    isAddingMember = false;
+                    return;
                 }
-            } catch(error) {
-                console.error("API 連線錯誤:", error);
-                showSettingsMsg("連線錯誤", false);
+
+                const tripData = tripSnap.data();
+
+                // 在現有陣列基礎上追加新成員（read → modify → write）
+                const updatedMembers = [
+                    ...(tripData.members || []),
+                    { id: newMemberId, name: newName, joinDate: joinDate }
+                ];
+                const updatedMemberDetails = [
+                    ...(tripData.memberDetails || []),
+                    { id: newMemberId, name: newName, join_date: joinDate }
+                ];
+
+                await window.fsUpdateDoc(tripRef, {
+                    members: updatedMembers,
+                    memberDetails: updatedMemberDetails
+                });
+
+                showSettingsMsg(`${newName} 已成功加入！`);
+                updateCloudIcon('success');
+                forceSyncDownload(); // 重新下載最新名單以刷新畫面
+
+            } catch (error) {
+                console.error("Firestore 新增成員失敗:", error);
+                if (error.code === 'permission-denied') {
+                    showSettingsMsg("權限不足：只有旅程成員可以新增人員", false);
+                } else {
+                    showSettingsMsg("新增失敗：" + error.message, false);
+                }
+                updateCloudIcon('error');
             } finally {
-                isAddingMember = false; // 處理完畢後解鎖
+                isAddingMember = false;
             }
         }
 
-        // ✨ [新增] 呼叫後端執行中途結算與封存 ✨
-        async function checkoutMember(memberName) {
-            if (!confirm(`確定要讓「${memberName}」提早結算並離隊嗎？\n請確認已將其當下的欠款或退款實體結清！\n(操作後無法於前端復原)`)) return;
+        // ✨ [修改] 成員離隊：改寫為直接更新 Firestore trips/{tripId} 文件 ✨
+        async function checkoutMember(memberId) {
+            // 先找出該成員的顯示名稱
+            const memberObj = members.find(m => (m.id || m) === memberId);
+            const displayName = memberObj ? (memberObj.name || memberObj) : memberId;
 
-            showSettingsMsg(`正在封存 ${memberName} 的資料...`);
+            if (!confirm(`確定要讓「${displayName}」提早結算並離隊嗎？\n請確認已將其當下的欠款或退款實體結清！\n(操作後無法於前端復原)`)) return;
+            if (!window.db) { showSettingsMsg("Firestore 尚未就緒", false); return; }
+
+            showSettingsMsg(`正在封存 ${displayName} 的資料...`);
             updateCloudIcon('unsynced');
 
             try {
-                const res = await fetch(gasApiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'checkout_member', trip_id: currentTripId, member_name: memberName })
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                if (!tripSnap.exists()) { showSettingsMsg("旅程文件不存在", false); return; }
+
+                const tripData = tripSnap.data();
+
+                // 從 members 陣列中移除（同時比對 id 與 name 以求相容舊版資料）
+                const updatedMembers = (tripData.members || []).filter(m => {
+                    const mId = m.id || m;
+                    const mName = m.name || m;
+                    return mId !== memberId && mName !== memberId;
                 });
-                const result = await res.json();
-                if(result.status === 'success') {
-                    showSettingsMsg(`${memberName} 已成功離隊！`);
-                    forceSyncDownload(); // 離隊成功後強制重新下載最新帳本與名單
+
+                await window.fsUpdateDoc(tripRef, { members: updatedMembers });
+
+                showSettingsMsg(`${displayName} 已成功離隊！`);
+                updateCloudIcon('success');
+                forceSyncDownload();
+
+            } catch (error) {
+                console.error("Firestore 離隊操作失敗:", error);
+                if (error.code === 'permission-denied') {
+                    showSettingsMsg("權限不足：只有旅程擁有者可執行此操作", false);
                 } else {
-                    showSettingsMsg("處理失敗：" + result.message, false);
+                    showSettingsMsg("操作失敗：" + error.message, false);
                 }
-            } catch(error) {
-                console.error("API 連線錯誤:", error);
-                showSettingsMsg("連線錯誤", false);
+                updateCloudIcon('error');
             }
         }
 
@@ -1320,143 +1747,220 @@
             setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
         }
 
-        // ✨ [修改] 替換為旅程代碼管理與暫存的同步按鈕邏輯 ✨
-       
-        function saveTripId() {
-            // ✨ [修正] 強制將輸入的代碼轉換為大寫，確保跨裝置輸入大小寫時皆視為相同專案 ✨
+        // ✨ [新增] 產生並複製深層連結 (Deep Link) 邀請網址 ✨
+        function generateDeepLink() {
+            if (!currentTripId || !currentInviteCode) {
+                showSettingsMsg("請先確認您已在旅程中，且擁有代碼與邀請碼", false);
+                return;
+            }
+            const baseUrl = window.location.href.split('?')[0];
+            const shareUrl = `${baseUrl}?tripId=${encodeURIComponent(currentTripId)}&invite=${encodeURIComponent(currentInviteCode)}`;
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert("🔗 已複製專屬邀請連結！\n請直接貼給朋友，點擊後即可一鍵加入。");
+            }).catch(() => {
+                showSettingsMsg("複製失敗，請手動選取網址列", false);
+            });
+        }
+
+        // ✨ [修改] 旅程建立 / 加入：改寫為 Firestore 版本，處理新建與加入兩種情境 ✨
+        async function saveTripId() {
             const newId = document.getElementById('cfg-trip-id').value.trim().toUpperCase();
+            const newInviteCode = document.getElementById('cfg-invite-code').value.trim();
             if (!newId) { showSettingsMsg("請輸入旅程代碼", false); return; }
-            
-            // ✨ [新增] 智慧旅程切換：切換前先清理本地舊帳本與身分防呆 ✨
+            if (!newInviteCode) { showSettingsMsg("請輸入邀請碼", false); return; }
+            if (!window.db) { showSettingsMsg("Firestore 尚未就緒，請重新整理", false); return; }
+
+            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
+            if (!currentUser) { showSettingsMsg("請先登入後再操作旅程", false); return; }
+
+            // 切換不同旅程時，清除舊身分綁定
             if (currentTripId !== newId) {
                 myIdentity = "";
                 localStorage.removeItem('tripSplit_myIdentity');
             }
-            
-            currentTripId = newId;
-            localStorage.setItem('tripSplit_tripId', currentTripId);
-            records = []; // 切換專案時先清空畫面
-            localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
-            showSettingsMsg("代碼切換中...");
-            renderAll();
-            renderIdentitySelect(); // 刷新選單
-            
-            // ✨ [修復1] 立即清空輸入框並提供明確的系統彈窗，讓使用者確認已建立/載入 ✨
-            document.getElementById('cfg-trip-id').value = '';
-            alert(`旅程專案 [${currentTripId}] 已成功建立與載入！`);
-            
-            // ✨ [新增] 切換代碼後，立刻觸發雲端下載 ✨
-            forceSyncDownload();
+
+            showLoading("正在建立或加入旅程...");
+
+            try {
+                const tripRef = window.fsDoc(window.db, 'trips', newId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+
+                if (tripSnap.exists()) {
+                    // ── 情境 A：旅程已存在，驗證邀請碼後加入 ──
+                    const tripData = tripSnap.data();
+                    if (tripData.inviteCode !== newInviteCode) {
+                        showSettingsMsg("邀請碼錯誤，請確認後再試", false);
+                        hideLoading();
+                        return;
+                    }
+                    // 若自己的 UID 尚未在 memberUids 內，則加入
+                    if (!(tripData.memberUids || []).includes(currentUser.uid)) {
+                        const updatedUids = [...(tripData.memberUids || []), currentUser.uid];
+                        await window.fsUpdateDoc(tripRef, { memberUids: updatedUids });
+                    }
+                    showSettingsMsg("成功加入旅程！");
+
+                } else {
+                    // ── 情境 B：全新旅程，由當前使用者建立 ──
+                    await window.fsSetDoc(tripRef, {
+                        ownerUid: currentUser.uid,
+                        tripName: newId,
+                        inviteCode: newInviteCode,
+                        memberUids: [currentUser.uid],
+                        members: [],
+                        publicPayers: [],
+                        memberDetails: [],
+                        is_closed: false, // 確保新增此欄位
+                        createdAt: window.fsServerTimestamp()
+                    });
+                    showSettingsMsg("新旅程建立成功！");
+                }
+
+                // ── 將此旅程記錄至使用者的 Firestore 個人文件 ──
+                const userRef = window.fsDoc(window.db, 'users', currentUser.uid);
+                const userSnap = await window.fsGetDoc(userRef);
+                const existingTripIds = userSnap.exists() ? (userSnap.data().tripIds || []) : [];
+                const filteredTripIds = existingTripIds.filter(t => t.tripId !== newId);
+                const updatedTripIds = [
+                    { tripId: newId, lastAccess: new Date().toISOString() },
+                    ...filteredTripIds
+                ];
+                await window.fsSetDoc(userRef, {
+                    email: currentUser.email || '',
+                    tripIds: updatedTripIds
+                }, { merge: true });
+
+                // ── 更新本機狀態 ──
+                currentTripId = newId;
+                currentInviteCode = newInviteCode;
+                localStorage.setItem('tripSplit_tripId', currentTripId);
+                localStorage.setItem('tripSplit_inviteCode', currentInviteCode);
+                // 同時以 per-trip key 儲存，供 Dashboard 切換時查找
+                localStorage.setItem(`tripSplit_inviteCode_${newId}`, newInviteCode);
+
+                await saveTripHistory(currentTripId, currentInviteCode, myIdentity);
+
+                records = [];
+                await dbClear('recordsStore');
+                renderAll();
+                renderIdentitySelect();
+
+                document.getElementById('cfg-trip-id').value = '';
+                document.getElementById('cfg-invite-code').value = '';
+
+                hideLoading();
+                forceSyncDownload(); // 觸發下載最新旅程資料
+
+            } catch (error) {
+                console.error("旅程建立/加入失敗:", error);
+                hideLoading();
+                if (error.code === 'permission-denied') {
+                    showSettingsMsg("權限不足：請確認邀請碼是否正確", false);
+                } else {
+                    showSettingsMsg("操作失敗：" + error.message, false);
+                }
+            }
         }
 
         function loadTripConfig() {
             if (currentTripId) {
                 document.getElementById('cfg-trip-id').value = currentTripId;
             }
-            if (gasApiUrl) {
-                const apiInput = document.getElementById('cfg-api-url');
-                if(apiInput) apiInput.value = gasApiUrl;
+            if (currentInviteCode) {
+                const inviteInput = document.getElementById('cfg-invite-code');
+                if (inviteInput) inviteInput.value = currentInviteCode;
             }
         }
 
-        // ✨ [新增] 儲存專屬資料庫 API 網址 ✨
-        function saveApiUrl() {
-            const newUrl = document.getElementById('cfg-api-url').value.trim();
-            if (!newUrl || !newUrl.startsWith("https://script.google.com/")) { 
-                showSettingsMsg("請輸入有效的 Google Apps Script 網址", false); 
-                return; 
-            }
-            gasApiUrl = newUrl;
-            localStorage.setItem('tripSplit_gasApiUrl', gasApiUrl);
-            showSettingsMsg("資料庫 API 綁定成功！");
-            
-            // 綁定成功後，若已有專案代碼，立刻強制重新同步連線新資料庫
-            if (currentTripId) {
-                forceSyncDownload();
-            }
-        }
-
-        // ✨ [修改] 正式對接 Google Sheets 進行資料與名單下載 ✨
+       // ✨ [修改] 從 Firestore 下載旅程資料，取代原本的 GAS fetch ✨
         async function forceSyncDownload() {
             if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
-            if (hasUnsyncedChanges) { 
-                showSettingsMsg("偵測到離線未同步資料，暫停背景下載以免覆蓋！", false); 
+            if (!window.db) { showSettingsMsg("Firestore 尚未就緒，請重新整理", false); return; }
+            if (hasUnsyncedChanges) {
+                showSettingsMsg("偵測到離線未同步資料，暫停下載以免覆蓋！", false);
                 updateCloudIcon('unsynced');
-                return; 
+                return;
             }
             showLoading("雲端同步中...");
             try {
-                // 透過 GET 請求呼叫我們部署的 GAS API，並帶上 Trip ID (✨加入 encodeURIComponent 確保中文代碼傳輸安全✨)
-                const res = await fetch(`${gasApiUrl}?trip_id=${encodeURIComponent(currentTripId)}`);
-                const data = await res.json();
-                
-                if (data.status === 'success') {
-                    // 1. 動態更新參與人員名單 (若雲端有資料)
-                    // ✨ [修正] 必須無條件覆蓋，避免切換全新專案時殘留上一個專案的人員名單 ✨
-                    members = data.members || [];
-                    
-                    // ✨ [補齊遺漏] 智慧旅程切換：若為全新專案 (雲端無成員)，觸發人數建置對話框 ✨
-                    if (members.length === 0 && currentTripId !== "") {
-                        setTimeout(() => {
-                            const firstMember = prompt(`偵測到全新旅程專案「${currentTripId}」！\n請輸入第一位初始成員（例如您的姓名）來建立此專案：`);
-                            if (firstMember && firstMember.trim() !== "") {
-                                const inputObj = document.getElementById('input-new-member');
-                                if(inputObj) inputObj.value = firstMember.trim();
-                                addNewMember(); // 自動呼叫既有的新增成員函數寫入雲端
-                            }
-                        }, 500);
-                    }
-                    
-                    // ✨ [新增] 同步更新有交公費的人員名冊 ✨
-                    window.currentPublicPayers = data.public_payers || [];
-                    
-                    // ✨ [新增] 同步儲存成員加入日期明細表 ✨
-                    window.memberDetailsList = data.member_details || [];
-                    
-                    // 2. 更新歷史帳務明細
-                    if (data.transactions) {
-                        records = data.transactions;
-                        // ✨ [修正] 將雲端下載的數值 ID 強制轉回字串，徹底解除編輯鎖死 Bug ✨
-                        records.forEach(r => r.id = String(r.id));
-                        localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records));
-                    }
-                    
-                    // ✨ [新增] 雲端強制銷毀 (Kill Switch) 驗證 ✨
-                    // 若本機有綁定身分，但該身分已不存在於雲端傳回的活躍名單中 (被設為 Left 或刪除)
-                    if (myIdentity && members.length > 0 && !members.includes(myIdentity)) {
-                        alert("⚠️ 系統警告：您的帳號已被標記為離隊或專案已結案。本地資料將立即銷毀並登出。");
-                        localStorage.removeItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords');
-                        localStorage.removeItem('tripSplit_tripId');
-                        localStorage.removeItem('tripSplit_myIdentity');
-                        location.reload(); // 強制重整自爆清空權限
+                // ── 1. 讀取旅程主文件，取得成員名單與設定 ──
+                // 修改後：請完整替換為以下程式碼
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+
+                if (!tripSnap.exists()) {
+                    // 若是原本已在旅程中，卻突然抓不到文件，代表專案已被主揪終極銷毀
+                    if (members.length > 0) {
+                        executeForceExitSequence();
                         return;
                     }
-                    
-                    updateCloudIcon('success');
-                    renderAll();
-                    
-                    // ✨ [修復] 手機端同步完成後，強制立刻刷新設定面板的「身分綁定選單」與「成員管理清單」，解決切換代碼後選單維持空白的 Bug ✨
-                    renderIdentitySelect();
-                    renderSettingsMembers();
-                    
-                    showSettingsMsg("雲端資料同步成功！");
-                } else {
-                    showSettingsMsg("同步失敗：" + data.message, false);
+                    // 全新旅程：文件不存在，觸發初始化建立
+                    showSettingsMsg("找不到此旅程，請確認代碼或先建立旅程", false);
                     updateCloudIcon('error');
+                    hideLoading();
+                    return;
                 }
+
+                const tripData = tripSnap.data();
+
+                // 無條件覆蓋，避免切換旅程時殘留舊名單
+                members = tripData.members || [];
+                window.currentPublicPayers = tripData.publicPayers || [];
+                window.memberDetailsList = tripData.memberDetails || [];
+                window.currentTripOwnerUid = tripData.ownerUid || ""; // ✨ [新增] 將雲端的主揪 UID 記錄至全域變數中 ✨
+                window.currentTripIsClosed = tripData.is_closed || false; // ✨ [新增] 記錄專案是否已封存，供前端防護使用 ✨
+
+                // ── 2. 讀取所有帳務明細（transactions 子集合）──
+                const txColRef = window.fsCollection(window.db, 'trips', currentTripId, 'transactions');
+                const txSnap = await window.fsGetDocs(txColRef);
+
+                records = [];
+                txSnap.forEach(docSnap => {
+                    const r = { id: String(docSnap.id), ...docSnap.data() };
+                    if (!r.currency) r.currency = 'TWD';
+                    if (!r.type) r.type = 'expense';
+                    // 移除 Firestore Timestamp 物件，保留純字串格式
+                    if (r.updatedAt && typeof r.updatedAt.toDate === 'function') {
+                        r.updatedAt = r.updatedAt.toDate().toISOString();
+                    }
+                    records.push(r);
+                });
+
+                // ── 3. 寫入本地 IndexedDB 快取 ──
+                await dbClear('recordsStore');
+                for (const r of records) {
+                    await dbPut('recordsStore', r);
+                }
+
+                updateCloudIcon('success');
+                renderAll();
+                renderIdentitySelect();
+                renderSettingsMembers();
+                showSettingsMsg("雲端資料同步成功！");
+
             } catch (error) {
-                console.error(error);
-                showSettingsMsg("網路連線異常", false);
+                console.error("forceSyncDownload 失敗:", error);
+                // permission-denied 代表尚未加入此旅程或 Security Rules 攔截
+                if (error.code === 'permission-denied') {
+                    showSettingsMsg("權限不足：您尚未加入此旅程或邀請碼有誤", false);
+                } else {
+                    showSettingsMsg("同步失敗：" + error.message, false);
+                }
                 updateCloudIcon('error');
             } finally {
                 hideLoading();
             }
         }
-        
-        // ✨ [修改] 提示目前採即時上傳制 ✨
-        async function forceSyncUpload() { 
+
+        // ✨ [修改] 手動強制補送佇列至 Firestore（原 GAS 覆蓋邏輯已廢棄）✨
+        async function forceSyncUpload() {
             if (!currentTripId) { showSettingsMsg("請先設定旅程代碼", false); return; }
-            showSettingsMsg("目前採即時自動上傳，無需手動覆蓋");
+            if (syncQueue.length === 0) {
+                showSettingsMsg("目前無待補送資料，已是最新狀態");
+                return;
+            }
+            showSettingsMsg(`正在補送 ${syncQueue.length} 筆離線資料...`);
+            await processSyncQueue();
         }
 
         function exportData() { if (records.length === 0) { showSettingsMsg("無資料可匯出", false); return; } try { const d = JSON.stringify(records), u = 'data:application/json;charset=utf-8,' + encodeURIComponent(d), l = document.createElement('a'); l.href = u; l.download = `記帳備份_${getLocalYMD(new Date())}.json`; document.body.appendChild(l); l.click(); document.body.removeChild(l); showSettingsMsg("JSON 匯出成功！"); } catch (e) { showSettingsMsg("匯出失敗", false); } }
@@ -1468,8 +1972,12 @@
                     const im = JSON.parse(e.target.result); 
                     if (Array.isArray(im)) { 
                         records = im; 
-                        records.forEach(r=>{if(!r.type)r.type='expense'; if(!r.currency)r.currency='TWD';}); 
-                        localStorage.setItem('tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_expenseRecords', JSON.stringify(records)); 
+                        await dbClear('recordsStore'); // ✨ [修改] 清空舊庫
+                        for (const r of records) {
+                            if(!r.type) r.type='expense'; 
+                            if(!r.currency) r.currency='TWD';
+                            await dbPut('recordsStore', r); // ✨ [修改] 寫入新資料
+                        }
                         showSettingsMsg("還原成功！"); 
                         renderAll(); 
                         
@@ -1484,52 +1992,85 @@
             r.readAsText(f); 
         }
 // --- 密碼鎖邏輯核心 ---
-        function inputPass(num) {
-            if (currentInput.length >= 6) return;
-            currentInput += num;
-            updatePassDots();
+        
+        async function handleFirebaseLogin() {
+            if (!window.firebaseAuth) {
+                alert("Firebase 尚未載入完成，請稍候");
+                return;
+            }
+            const email = document.getElementById('fb-email').value;
+            const password = document.getElementById('fb-password').value;
+            const errorMsg = document.getElementById('fb-error-msg');
             
+            if (!email || !password) {
+                errorMsg.innerText = "請輸入完整信箱與密碼";
+                errorMsg.style.opacity = '1';
+                return;
+            }
             
-            if (currentInput.length === 6) {
-                setTimeout(() => {
-                    // ✨ [新增] 超級救援金鑰設定為 089478 ✨
-                    const RECOVERY_KEY = "089478";
-
-                    if (currentInput === tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_tripSplit_appPass) {
-                        currentUserRole = 'admin'; // ✨ [新增] 辨識為管理者 ✨
-                        unlockApp();
-                    } else if (currentInput === guestPass) {
-                        currentUserRole = 'guest'; // ✨ [新增] 辨識為訪客 ✨
-                        unlockApp();
-                    } else if (currentInput === RECOVERY_KEY) {
-                        // ✨ [修改] 攔截成功，直接呼叫客製化按鈕彈窗 ✨
-                        openRecoveryModal();
-                    } else {
-                        alert("密碼錯誤，請重新輸入");
-                        clearPass();
-                    }
-                }, 100);
+            try {
+                const userCredential = await window.signInWithEmailAndPassword(window.firebaseAuth, email, password);
+                
+                // ✨ [修改] 移除錯誤的 myIdentity 綁定，登入僅負責解鎖畫面 ✨
+                currentUserRole = 'admin';
+                
+                unlockApp();
+            } catch (error) {
+                console.error("登入失敗", error);
+                errorMsg.innerText = "登入失敗：" + error.code;
+                errorMsg.style.opacity = '1';
             }
         }
 
-        function updatePassDots() {
-            const dots = document.getElementById('pass-dots').children;
-            for (let i = 0; i < 6; i++) {
-                if (i < currentInput.length) {
-                    dots[i].className = "w-4 h-4 rounded-full bg-indigo-400 border-2 border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)]";
-                } else {
-                    dots[i].className = "w-4 h-4 rounded-full border-2 border-white/30";
+        // 監聽驗證狀態變化，若重新整理時已登入則自動解鎖
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (window.onAuthStateChanged && window.firebaseAuth) {
+                    window.onAuthStateChanged(window.firebaseAuth, async (user) => {
+                        if (user) {
+                            // ✨ [修改] 移除錯誤的 myIdentity 綁定 ✨
+                            currentUserRole = 'admin';
+
+                            // ✨ [新增] 自動救援機制：若發現本機綁定了錯誤的信箱 UID，立即自動清除以解除面板鎖定 ✨
+                            if (myIdentity && !myIdentity.startsWith('mem_')) {
+                                myIdentity = "";
+                                localStorage.removeItem('tripSplit_myIdentity');
+                            }
+
+                            unlockApp();
+
+                            // ✨ [新增] 檢查 sessionStorage 是否有待處理的深層連結邀請 ✨
+                            const pendingInvite = sessionStorage.getItem('tripSplit_pending_invite');
+                            if (pendingInvite) {
+                                try {
+                                    const { tripId, inviteCode } = JSON.parse(pendingInvite);
+
+                                    // 填入介面欄位
+                                    document.getElementById('cfg-trip-id').value = tripId;
+                                    document.getElementById('cfg-invite-code').value = inviteCode;
+
+                                    // 為了防呆，清理網址列上的參數，避免頁面重整時再次觸發
+                                    window.history.replaceState({}, document.title, window.location.pathname);
+
+                                    await saveTripId(); // 自動呼叫既有的加入旅程功能
+                                    sessionStorage.removeItem('tripSplit_pending_invite'); // 執行完畢後清除
+
+                                    // 延遲開啟設定面板，引導新使用者綁定自己的姓名
+                                    setTimeout(() => { 
+                                        openSettings(); 
+                                        alert("已透過專屬連結成功加入旅程！\n請在設定面板的「本機身分綁定」中選擇您的名字。"); 
+                                    }, 1000);
+                                } catch (e) {
+                                    console.error("處理深層連結失敗:", e);
+                                }
+                            }
+                        }
+                    });
                 }
-            }
-        }
+            }, 500); 
+        });
 
-        function clearPass() {
-            currentInput = "";
-            updatePassDots();
-        }
-
-        function unlockApp() {
-            const overlay = document.getElementById('lock-screen');
+        function unlockApp() {            const overlay = document.getElementById('lock-screen');
             overlay.classList.add('opacity-0', 'pointer-events-none');
             overlay.style.transform = "scale(1.1)";
             setTimeout(() => { overlay.classList.add('hidden'); }, 400);
@@ -1549,7 +2090,7 @@
             const c = document.getElementById('recovery-content');
             if(!m || !c) return;
             m.classList.add('opacity-0'); c.classList.remove('scale-100'); c.classList.add('scale-95');
-            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); clearPass(); }, 300);
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
         }
 
         function executeRecovery(type) {
@@ -1589,6 +2130,19 @@
             const titleEl = document.getElementById('settlementTitle');
             if (titleEl) titleEl.innerHTML = `<i class="ph ph-calculator text-indigo-600 text-xl"></i> 旅程最終轉帳總清結`;
             
+            // ✨ [新增] 動態比對當前登入者是否為主揪，若為一般親友且已綁定身分，則隱藏強制關帳按鈕 ✨
+            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
+            const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
+            const isSetupComplete = (currentTripId !== "" && myIdentity !== "");
+            
+            // 修改後：請完整替換為以下程式碼
+            const btnLock = document.getElementById('btn-lock-trip');
+            const btnClosePerm = document.getElementById('btn-close-trip-perm');
+            const btnDestroy = document.getElementById('btn-destroy-trip');
+            if (btnLock) btnLock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            if (btnClosePerm) btnClosePerm.style.display = isOwner ? 'block' : 'none';
+            if (btnDestroy) btnDestroy.style.display = isOwner ? 'block' : 'none';
+
             calculateSettlement();
             const m = document.getElementById('settlementModal'), c = document.getElementById('settlementContent');
             m.classList.remove('hidden'); m.classList.add('flex');
@@ -1645,29 +2199,48 @@
                     }
                 });
 
-                // ✨ [修改] 導入公費個人化結算演算法 ✨
-                let publicContributions = {};
+                // ✨ [升級] 導入基於「活躍成員快照」的精確公費結算演算法 ✨
+                let publicLedger = {}; // 記錄每個人在公費池中的淨值 (已繳預收款 + 均攤退稅收入 - 均攤公費支出)
+                let totalPublicContributions = 0;
                 let otherPublicIncome = 0;
-                
+                let publicExpense = 0;
+
+                // 建立快照母體防呆名單 (相容舊資料)
+                const fallbackPool = (window.currentPublicPayers && window.currentPublicPayers.length > 0) 
+                    ? window.currentPublicPayers 
+                    : members.map(m => m.id || m);
+
                 records.filter(r => r.currency === curr && r.type === 'income').forEach(r => {
-                    // 如果是預收或補繳公費，且有明確付款人，記入該成員帳戶
+                    // 如果是預收或補繳公費，且有明確付款人，記入該成員帳戶 (資金流入)
                     if (r.category.includes('公費') && r.payer && r.payer !== '公費' && r.payer !== '系統入帳') {
-                        publicContributions[r.payer] = (publicContributions[r.payer] || 0) + r.amount;
+                        publicLedger[r.payer] = (publicLedger[r.payer] || 0) + r.amount;
+                        totalPublicContributions += r.amount;
                     } else {
-                        // 其他無記名收入（如退稅、退款）視為降低總體公費支出
+                        // 其他無記名收入（如退稅、退款）增加公費實體餘額，並均攤給當時的快照成員 (提升淨值)
                         otherPublicIncome += r.amount;
+                        const snapshot = (r.member_snapshot && r.member_snapshot.length > 0) ? r.member_snapshot : fallbackPool;
+                        const splitAmt = r.amount / snapshot.length;
+                        snapshot.forEach(p => {
+                            publicLedger[p] = (publicLedger[p] || 0) + splitAmt;
+                        });
                     }
                 });
 
-                const publicExpense = records.filter(r => r.currency === curr && r.type === 'expense' && r.payer === '公費').reduce((sum, r) => sum + r.amount, 0);
+                // 處理公費支出，均攤扣減當時快照成員的淨值
+                records.filter(r => r.currency === curr && r.type === 'expense' && r.payer === '公費').forEach(r => {
+                    publicExpense += r.amount;
+                    const snapshot = (r.member_snapshot && r.member_snapshot.length > 0) ? r.member_snapshot : fallbackPool;
+                    const splitAmt = r.amount / snapshot.length;
+                    snapshot.forEach(p => {
+                        publicLedger[p] = (publicLedger[p] || 0) - splitAmt;
+                    });
+                });
                 
                 // 總計目前公費現金包剩餘實體金額
-                const totalPublicContributions = Object.values(publicContributions).reduce((a, b) => a + b, 0);
                 const publicSurplus = totalPublicContributions + otherPublicIncome - publicExpense;
-                
                 const hasPublicTransactions = totalPublicContributions > 0 || publicExpense > 0 || otherPublicIncome > 0;
 
-                // 將成員區分為 債權人陣列 與 債務人陣列
+                // 將成員區分為 債權人陣列 與 債務人陣列 (私人代墊部分維持不變)
                 let creditors = [];
                 let debtors = [];
 
@@ -1691,46 +2264,45 @@
                         </h4>
                         <div class="space-y-4">`;
 
+                    // 準備成員名稱對照字典，防止 UUID 無法辨識 (將範圍拉高供全域使用)
+                    const memberMap = new Map();
+                    members.forEach(m => memberMap.set(m.id || m, m.name || m));
+
                     // 📢 (區塊 A) 處理公費結餘與多退少補指示
                     if (hasPublicTransactions) {
-                        const publicPayers = (window.currentPublicPayers && window.currentPublicPayers.length > 0) 
-                            ? window.currentPublicPayers 
-                            : members;
-                        
-                        // 計算每個人應攤的淨公費支出
-                        const netPublicExpense = publicExpense - otherPublicIncome;
-                        const expensePerPerson = netPublicExpense / publicPayers.length;
-                        
                         finalHtml += `
                         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
                             <div class="flex justify-between items-center text-xs font-bold text-amber-800 border-b border-amber-200/50 pb-2">
                                 <span class="flex items-center gap-1"><i class="ph ph-coins"></i> 💰 公費現金包目前剩餘：</span>
                                 <span class="text-sm font-black">${Math.round(publicSurplus).toLocaleString()} ${curr}</span>
                             </div>
-                            <p class="text-[10px] text-amber-600 leading-tight font-bold">退還與補交方案（以個人已繳扣除應攤額）：</p>
+                            <p class="text-[10px] text-amber-600 leading-tight font-bold">退還與補交方案（依歷史活躍快照精算）：</p>
                             <div class="grid grid-cols-1 gap-1.5 pt-1">`;
                         
-                        publicPayers.forEach(payer => {
-                            const paid = publicContributions[payer] || 0;
-                            const diff = paid - expensePerPerson;
+                        // 只針對在 publicLedger 內有帳務異動的成員，或活躍母體進行結算
+                        const uniquePayers = [...new Set([...Object.keys(publicLedger), ...fallbackPool])];
+                        
+                        uniquePayers.forEach(payerId => {
+                            const diff = publicLedger[payerId] || 0;
                             const roundedDiff = Math.round(diff);
+                            const payerName = memberMap.get(payerId) || payerId;
                             
                             if (roundedDiff > 0) {
                                 finalHtml += `
                                 <div class="flex justify-between items-center bg-white border border-amber-100 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm text-gray-700">
-                                    <span>👤 ${payer}</span>
+                                    <span>👤 ${payerName}</span>
                                     <span class="text-emerald-600 font-black">拿回 +${roundedDiff.toLocaleString()} ${curr}</span>
                                 </div>`;
                             } else if (roundedDiff < 0) {
                                 finalHtml += `
                                 <div class="flex justify-between items-center bg-white border border-red-100 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm text-gray-700">
-                                    <span>👤 ${payer}</span>
+                                    <span>👤 ${payerName}</span>
                                     <span class="text-red-500 font-black">需補交 ${Math.abs(roundedDiff).toLocaleString()} ${curr}</span>
                                 </div>`;
                             } else {
                                 finalHtml += `
                                 <div class="flex justify-between items-center bg-white border border-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm text-gray-400">
-                                    <span>👤 ${payer}</span>
+                                    <span>👤 ${payerName}</span>
                                     <span>打平結清</span>
                                 </div>`;
                             }
@@ -1752,14 +2324,18 @@
                             let debtor = debtors[dIdx];
                             let settleAmt = Math.min(creditor.amount, debtor.amount);
                             
+                            // ✨ 在這裡透過 memberMap 轉換 UUID 回真實姓名 ✨
+                            let debtorDisplayName = memberMap.get(debtor.name) || debtor.name;
+                            let creditorDisplayName = memberMap.get(creditor.name) || creditor.name;
+                            
                             finalHtml += `
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
                                 <div class="flex items-center gap-2">
                                     <span class="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[10px] font-bold border border-red-100">誰付錢</span>
-                                    <span class="font-black text-gray-800 text-sm">${debtor.name}</span>
+                                    <span class="font-black text-gray-800 text-sm">${debtorDisplayName}</span>
                                     <i class="ph ph-arrow-fat-right text-indigo-400 animate-pulse"></i>
                                     <span class="px-1.5 py-0.5 bg-green-50 text-green-600 rounded text-[10px] font-bold border border-green-100">給誰</span>
-                                    <span class="font-black text-gray-800 text-sm">${creditor.name}</span>
+                                    <span class="font-black text-gray-800 text-sm">${creditorDisplayName}</span>
                                 </div>
                                 <div class="text-right">
                                     <span class="text-xs font-bold text-gray-400 mr-0.5">金額:</span>
@@ -1821,6 +2397,399 @@
                 });
             }
         }
+
+        async function lockCurrentTrip() {
+            // [防呆二次確認] 強制手動輸入 Trip ID，避免觸控誤觸
+            const inputId = prompt("【防呆二次確認】\n關閉旅程屬破壞性體驗操作！\n執行後，此旅程的所有帳目將被永久鎖定為唯讀狀態。\n請輸入 Trip ID「" + currentTripId + "」以放行操作：");
+            if (inputId !== currentTripId) { 
+                if (inputId !== null) alert("Trip ID 驗證不符，關帳操作已取消。"); 
+                return; 
+            }
+            if (!window.db || !currentTripId) { alert("系統尚未就緒，請檢查連線狀態"); return; }
+            
+            showLoading("正在鎖定全專案帳目...");
+            try {
+                // 取得當前旅程的所有帳務明細
+                const txColRef = window.fsCollection(window.db, 'trips', currentTripId, 'transactions');
+                const txSnap = await window.fsGetDocs(txColRef);
+                
+                // 使用 Firestore 的 Batch 批次處理，確保所有帳單同時上鎖
+                const batch = window.fsWriteBatch(window.db);
+                txSnap.forEach(docSnap => {
+                    batch.update(docSnap.ref, { is_locked: true });
+                });
+                
+                // 同步將旅程主文件也標記為上鎖
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                batch.update(tripRef, { is_locked: true });
+                
+                await batch.commit();
+                
+                alert("✅ 已成功關帳！所有歷史紀錄皆已永久鎖定。");
+                forceSyncDownload(); // 強制重整畫面，讓所有帳目套用唯讀視覺效果
+                closeSettlement();
+            } catch(e) {
+                console.error("關帳失敗", e);
+                alert("關帳失敗，請確認您是否擁有權限：" + e.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function closeTripPermanently() {
+            const inputId = prompt("【警告】永久關閉旅程後，全團成員皆無法再新增帳目！\n請輸入 Trip ID「" + currentTripId + "」以確認銷毀：");
+            if (inputId !== currentTripId) { alert("代碼錯誤，操作已取消。"); return; }
+            
+            showLoading("正在永久封存旅程...");
+            try {
+                // 1. 更新旅程主文件
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                await window.fsUpdateDoc(tripRef, { is_closed: true });
+
+                // 2. 更新 User 資料庫中的快照，確保 Dashboard 狀態同步
+                const uid = window.firebaseAuth.currentUser.uid;
+                const userRef = window.fsDoc(window.db, 'users', uid);
+                const userSnap = await window.fsGetDoc(userRef);
+                if (userSnap.exists()) {
+                    const trips = userSnap.data().tripIds || [];
+                    const updatedTrips = trips.map(t => t.tripId === currentTripId ? { ...t, is_closed: true } : t);
+                    await window.fsUpdateDoc(userRef, { tripIds: updatedTrips });
+                }
+                
+                closeSettlement(); // 隱藏原本的結算報表
+                showArchiveSuccessModal(); // 顯示祝賀畫面
+            // 修改後：請完整替換為以下程式碼
+            } catch(e) { 
+                alert("操作失敗：" + e.message); 
+            } finally { 
+                hideLoading(); 
+            }
+        }
+
+        async function destroyTripPermanently() {
+            const inputId = prompt("【極度危險】終極銷毀將徹底刪除本專案的所有雲端資料，包含所有成員的紀錄！\n這項操作無法復原。\n請輸入 Trip ID「" + currentTripId + "」以執行終極銷毀：");
+            if (inputId !== currentTripId) { alert("代碼錯誤，銷毀操作已取消。"); return; }
+            
+            showLoading("正在抹除所有雲端與本機資料...");
+            try {
+                // 1. 取得主文件，以獲得所有相關聯的 memberUids
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                const memberUids = tripSnap.exists() ? (tripSnap.data().memberUids || []) : [];
+
+                // 2. 清空所有交易紀錄 (Transactions)
+                const txColRef = window.fsCollection(window.db, 'trips', currentTripId, 'transactions');
+                const txSnap = await window.fsGetDocs(txColRef);
+                const batch = window.fsWriteBatch(window.db);
+                txSnap.forEach(docSnap => {
+                    batch.delete(docSnap.ref);
+                });
+                await batch.commit();
+
+                // 3. 將這個專案從所有成員的 User 文件紀錄中抹除
+                for (const u of memberUids) {
+                    const uRef = window.fsDoc(window.db, 'users', u);
+                    const uSnap = await window.fsGetDoc(uRef);
+                    if (uSnap.exists()) {
+                        const currentTrips = uSnap.data().tripIds || [];
+                        const newTrips = currentTrips.filter(t => t.tripId !== currentTripId);
+                        await window.fsUpdateDoc(uRef, { tripIds: newTrips });
+                    }
+                }
+
+                // 4. 最後一擊：刪除專案主文件
+                await window.fsDeleteDoc(tripRef);
+
+                // 5. 觸發自己的強制蓋台與清理流程
+                executeForceExitSequence();
+                
+            } catch(e) { 
+                alert("銷毀過程發生錯誤：" + e.message); 
+                hideLoading();
+            }
+        }
+
+        async function executeForceExitSequence() {
+            // 隱藏讀取遮罩
+            hideLoading();
+
+            // 1. 強制關閉所有可能開啟的 Modal 彈窗
+            const modals = ['addRecordModal', 'settlementModal', 'settingsModal', 'dashboardModal', 'archiveSuccessModal', 'recovery-modal'];
+            modals.forEach(id => {
+                const m = document.getElementById(id);
+                if (m) {
+                    m.classList.add('hidden');
+                    m.classList.remove('flex');
+                }
+            });
+            
+            // 2. 徹底洗淨本機快取與記憶庫，拒絕復活
+            localStorage.removeItem('tripSplit_tripId');
+            localStorage.removeItem('tripSplit_inviteCode');
+            localStorage.removeItem(`tripSplit_inviteCode_${currentTripId}`);
+            localStorage.removeItem('tripSplit_myIdentity');
+            currentTripId = "";
+            myIdentity = "";
+            records = [];
+            members = [];
+            window.currentPublicPayers = [];
+            if (typeof dbClear === 'function') await dbClear('recordsStore');
+            
+            // 3. 呼叫鎖定蓋台動畫
+            const lockScreen = document.getElementById('lock-screen');
+            if (lockScreen) {
+                lockScreen.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+                lockScreen.classList.add('flex');
+                // 利用 setTimeout 確保動畫流暢展現「從天而降重新鎖死」的感覺
+                setTimeout(() => { lockScreen.style.transform = "scale(1)"; }, 50);
+                
+                // 4. 客製化專屬溫馨收尾文字
+                const titleEl = lockScreen.querySelector('h2');
+                const subEl = lockScreen.querySelector('p');
+                if (titleEl) titleEl.innerText = "旅程已結束";
+                if (subEl) subEl.innerText = "靜待下回再次出發";
+                
+                // 隱藏登入輸入框與按鈕區塊，呈現最終唯美畫面
+                const formDiv = lockScreen.querySelector('.flex.flex-col.gap-4.px-4');
+                if (formDiv) formDiv.style.display = 'none';
+            }
+        }
+
+        function showArchiveSuccessModal() {
+            const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { 
+                m.classList.remove('opacity-0'); 
+                c.classList.remove('scale-95'); 
+                c.classList.add('scale-100'); 
+            });
+        }
+
+        function hideArchiveSuccessModal() {
+            const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
+            m.classList.add('opacity-0'); 
+            c.classList.remove('scale-100'); 
+            c.classList.add('scale-95');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+
+        async function returnToDashboardAfterArchive() {
+            hideArchiveSuccessModal();
+            currentTripId = "";
+            currentInviteCode = "";
+            myIdentity = "";
+            records = [];
+            await dbClear('recordsStore');
+            updateHeaderTitle();
+            renderAll();
+            openDashboard();
+        }
+
+        async function createNewTripAfterArchive() {
+            hideArchiveSuccessModal();
+            currentTripId = "";
+            currentInviteCode = "";
+            myIdentity = "";
+            records = [];
+            await dbClear('recordsStore');
+            updateHeaderTitle();
+            renderAll();
+            openSettings();
+        }
+
+
+        function showArchiveSuccessModal() {
+            const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('scale-95'); c.classList.add('scale-100'); });
+        }
+
+        function hideArchiveSuccessModal() {
+            const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
+            m.classList.add('opacity-0'); c.classList.remove('scale-100'); c.classList.add('scale-95');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+
+        async function returnToDashboardAfterArchive() {
+            hideArchiveSuccessModal();
+            // 清空當前畫面殘留的舊專案狀態
+            currentTripId = "";
+            currentInviteCode = "";
+            myIdentity = "";
+            records = [];
+            await dbClear('recordsStore');
+            updateHeaderTitle();
+            renderAll();
+            openDashboard();
+        }
+
+        async function createNewTripAfterArchive() {
+            hideArchiveSuccessModal();
+            // 清空當前畫面殘留的舊專案狀態
+            currentTripId = "";
+            currentInviteCode = "";
+            myIdentity = "";
+            records = [];
+            await dbClear('recordsStore');
+            updateHeaderTitle();
+            renderAll();
+            openSettings();
+        }
+
+
+
+        // ================= 多旅程 Dashboard 邏輯 =================
+
+        // ✨ [修改] 同時寫入 localStorage 快取 與 Firestore users/{uid}，雙軌儲存 ✨
+        async function saveTripHistory(tId, iCode, identity) {
+            if (!tId) return;
+
+            // 1. localStorage 快取（保留作為離線備援）
+            let history = JSON.parse(localStorage.getItem('tripSplit_dashboard_history') || '[]');
+            history = history.filter(h => h.tripId !== tId);
+            history.unshift({ tripId: tId, inviteCode: iCode, identity: identity, lastAccess: new Date().toISOString() });
+            localStorage.setItem('tripSplit_dashboard_history', JSON.stringify(history));
+
+            // 2. Firestore 同步（登入狀態下執行，失敗不影響主功能）
+            if (window.db && window.firebaseAuth && window.firebaseAuth.currentUser) {
+                try {
+                    const uid = window.firebaseAuth.currentUser.uid;
+                    const userRef = window.fsDoc(window.db, 'users', uid);
+                    const userSnap = await window.fsGetDoc(userRef);
+                    const existingTripIds = userSnap.exists() ? (userSnap.data().tripIds || []) : [];
+                    const filtered = existingTripIds.filter(t => t.tripId !== tId);
+                    const updated = [{ tripId: tId, lastAccess: new Date().toISOString() }, ...filtered];
+                    await window.fsSetDoc(userRef, { tripIds: updated }, { merge: true });
+                } catch (e) {
+                    console.warn("Firestore 旅程歷史寫入失敗（不影響主功能）:", e);
+                }
+            }
+
+            updateHeaderTitle();
+        }
+
+        function updateHeaderTitle() {
+            const el = document.getElementById('header-trip-title');
+            if (el) el.innerText = currentTripId ? currentTripId : '家計總覽';
+        }
+
+        // ✨ [修改] 優先從 Firestore 讀取旅程清單，降級至 localStorage ✨
+        async function openDashboard() {
+            const list = document.getElementById('dashboard-trip-list');
+
+            list.innerHTML = `
+                <div class="text-center py-8 text-gray-400 text-sm font-bold flex flex-col items-center gap-2">
+                    <div class="w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                    載入旅程清單...
+                </div>`;
+
+            const m = document.getElementById('dashboardModal'), c = document.getElementById('dashboardContent');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('translate-y-full'); });
+
+            let tripList = [];
+
+            if (window.db && window.firebaseAuth && window.firebaseAuth.currentUser) {
+                try {
+                    const uid = window.firebaseAuth.currentUser.uid;
+                    const userRef = window.fsDoc(window.db, 'users', uid);
+                    const userSnap = await window.fsGetDoc(userRef);
+                    if (userSnap.exists() && (userSnap.data().tripIds || []).length > 0) {
+                        tripList = userSnap.data().tripIds.map(t => ({
+                            tripId: t.tripId,
+                            lastAccess: t.lastAccess || '',
+                            is_closed: t.is_closed || false
+                        }));
+                    }
+                } catch (e) {
+                    console.warn("Firestore 旅程清單讀取失敗:", e);
+                }
+            }
+
+            const activeTrips = tripList.filter(t => !t.is_closed);
+            const archivedTrips = tripList.filter(t => t.is_closed);
+
+            let html = '';
+
+            if (activeTrips.length > 0) {
+                html += `<div class="mb-6"><h4 class="text-[10px] font-black text-gray-400 mb-2 px-1 uppercase tracking-widest">活躍旅程</h4>`;
+                activeTrips.forEach(h => {
+                    const isActive = (h.tripId === currentTripId);
+                    html += `<div onclick="switchFromDashboard('${h.tripId}')" class="${isActive ? 'bg-indigo-600 border-indigo-700' : 'bg-white border-gray-200 hover:bg-gray-50'} border p-4 rounded-2xl cursor-pointer transition-all active:scale-95 flex justify-between items-center mb-2 shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center ${isActive ? 'bg-white/20' : 'bg-gray-100'}">
+                                <i class="ph ph-airplane-tilt ${isActive ? 'text-white' : 'text-gray-600'} text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black ${isActive ? 'text-white' : 'text-gray-800'}">${h.tripId}</h4>
+                                <p class="text-[10px] ${isActive ? 'text-indigo-200' : 'text-gray-500'} font-bold">點擊切換</p>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+
+            if (archivedTrips.length > 0) {
+                html += `<div><h4 class="text-[10px] font-black text-gray-400 mb-2 px-1 uppercase tracking-widest">已封存旅程</h4>`;
+                archivedTrips.forEach(h => {
+                    html += `<div class="bg-gray-100 border border-gray-200 p-4 rounded-2xl opacity-70 grayscale flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-200">
+                                <i class="ph ph-lock text-gray-500 text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-gray-600">${h.tripId}</h4>
+                                <p class="text-[10px] text-gray-500 font-bold">已凍結</p>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+
+            if (tripList.length === 0) {
+                list.innerHTML = '<div class="text-center py-10 text-gray-400 font-bold text-sm bg-white rounded-2xl border border-gray-100 shadow-sm">尚無旅程紀錄</div>';
+            } else {
+                list.innerHTML = html;
+            }
+        }
+
+        function closeDashboard() {
+            const m = document.getElementById('dashboardModal'), c = document.getElementById('dashboardContent');
+            m.classList.add('opacity-0'); c.classList.add('translate-y-full');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+        }
+
+        // ✨ [修改] 切換旅程不再需要傳遞邀請碼，Firestore UID 驗證已取代此機制 ✨
+        async function switchFromDashboard(tId) {
+            closeDashboard();
+            if (currentTripId === tId) return;
+
+            // 重置身分（切換旅程時需重新綁定）
+            myIdentity = "";
+            localStorage.removeItem('tripSplit_myIdentity');
+
+            // 從 per-trip localStorage 讀取邀請碼（避免欄位為空）
+            const savedInviteCode = localStorage.getItem(`tripSplit_inviteCode_${tId}`) || '';
+
+            currentTripId = tId;
+            currentInviteCode = savedInviteCode;
+            localStorage.setItem('tripSplit_tripId', currentTripId);
+            localStorage.setItem('tripSplit_inviteCode', currentInviteCode);
+
+            // 清除舊旅程本機快取
+            records = [];
+            await dbClear('recordsStore');
+
+            updateHeaderTitle();
+            renderAll();
+            renderIdentitySelect();
+
+            // 直接觸發 Firestore 下載，不再需要透過 saveTripId 重新驗證
+            await forceSyncDownload();
+        }
+        // ========================================================
 
         window.onload = init;
     </script>
