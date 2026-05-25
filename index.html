@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.3 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.4 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -2120,11 +2120,9 @@
 
         // ✨ [新增] 防逃避攔截檢查函式 ✨
         function checkAndForceOnboarding() {
-            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
-            const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
-            
-            // 條件：已在專案中 + 尚未綁定身分 + 不是主揪 ➔ 無處可逃強制蓋台
-            if (currentTripId && !myIdentity && !isOwner) {
+            // 💡 修正：全面拔除「主揪 (isOwner)」的豁免權。
+            // 條件：只要已進入專案 + 尚未綁定本機身分 (myIdentity) ➔ 任何人一律強制蓋台
+            if (currentTripId && !myIdentity) {
                 const m = document.getElementById('forceOnboardingModal');
                 if (m) {
                     m.classList.remove('hidden');
@@ -2140,23 +2138,33 @@
             if (!newName) { alert("請務必輸入姓名才能繼續使用系統！"); return; }
             if (!currentTripId || !window.db) { alert("系統尚未就緒，請重整網頁。"); return; }
             
-            showLoading("正在為您建立專屬身分...");
+            showLoading("正在為您建立與綁定專屬身分...");
             try {
                 const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
                 const tripSnap = await window.fsGetDoc(tripRef);
                 if (!tripSnap.exists()) throw new Error("找不到旅程資料");
                 
                 const tripData = tripSnap.data();
-                const newMemberId = generateMemberId();
-                const joinDate = getLocalYMD(new Date());
+                const existingMembers = tripData.members || [];
                 
-                // 1. 自動寫入陣列，無須主揪介入
-                const updatedMembers = [...(tripData.members || []), { id: newMemberId, name: newName, joinDate: joinDate }];
-                const updatedMemberDetails = [...(tripData.memberDetails || []), { id: newMemberId, name: newName, join_date: joinDate }];
-                await window.fsUpdateDoc(tripRef, { members: updatedMembers, memberDetails: updatedMemberDetails });
+                // ✨ 檢查是否已有同名成員，避免重整網頁後重複創建 ✨
+                let targetMemberId = null;
+                const existingMember = existingMembers.find(m => (m.name || m) === newName);
+                
+                if (existingMember) {
+                    // 若存在同名，直接綁定現有身分，不重複創建
+                    targetMemberId = existingMember.id || existingMember;
+                } else {
+                    // 若不存在，建立全新身分
+                    targetMemberId = generateMemberId();
+                    const joinDate = getLocalYMD(new Date());
+                    const updatedMembers = [...existingMembers, { id: targetMemberId, name: newName, joinDate: joinDate }];
+                    const updatedMemberDetails = [...(tripData.memberDetails || []), { id: targetMemberId, name: newName, join_date: joinDate }];
+                    await window.fsUpdateDoc(tripRef, { members: updatedMembers, memberDetails: updatedMemberDetails });
+                }
                 
                 // 2. 本機強制完成身分綁定
-                myIdentity = newMemberId;
+                myIdentity = targetMemberId;
                 localStorage.setItem('tripSplit_myIdentity', myIdentity);
                 
                 // 3. 隱藏蓋台
@@ -2167,7 +2175,7 @@
                 // 4. 重新同步，讓全系統認識這個新身分
                 forceSyncDownload(); 
             } catch(e) {
-                alert("建立失敗：" + e.message);
+                alert("建立/綁定失敗：" + e.message);
                 hideLoading();
             }
         }
