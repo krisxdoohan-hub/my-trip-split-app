@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.1 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -1515,10 +1515,11 @@
             const nicknameBlock = document.getElementById('setting-block-nickname');
             if (nicknameBlock) nicknameBlock.style.display = isSetupComplete ? 'block' : 'none';
 
+            // ✨ [修正] 嚴格權限控管：人員管理與安全性設定，絕對僅限主揪可見，其餘狀態一律隱藏 ✨
             const memBlock = document.getElementById('setting-block-members');
-            if (memBlock) memBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            if (memBlock) memBlock.style.display = isOwner ? 'block' : 'none';
             const secBlock = document.getElementById('setting-block-security');
-            if (secBlock) secBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            if (secBlock) secBlock.style.display = isOwner ? 'block' : 'none';
             
             const m = document.getElementById('settingsModal'), c = document.getElementById('settingsContent');
             m.classList.remove('hidden'); m.classList.add('flex');
