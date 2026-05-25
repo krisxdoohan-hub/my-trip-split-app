@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.8 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -2022,6 +2022,38 @@
             }
         }
 
+        async function handleFirebaseRegister() {
+            if (!window.firebaseAuth) {
+                alert("Firebase 尚未載入完成，請稍候");
+                return;
+            }
+            const email = document.getElementById('fb-email').value;
+            const password = document.getElementById('fb-password').value;
+            const errorMsg = document.getElementById('fb-error-msg');
+            
+            if (!email || !password) {
+                errorMsg.innerText = "請輸入完整信箱與密碼";
+                errorMsg.style.opacity = '1';
+                return;
+            }
+            
+            try {
+                const userCredential = await window.createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                currentUserRole = 'admin';
+                unlockApp();
+            } catch (error) {
+                console.error("註冊失敗", error);
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMsg.innerText = "此信箱已被註冊，請直接登入";
+                } else if (error.code === 'auth/weak-password') {
+                    errorMsg.innerText = "密碼過弱，請至少輸入 6 個字元";
+                } else {
+                    errorMsg.innerText = "註冊失敗：" + error.code;
+                }
+                errorMsg.style.opacity = '1';
+            }
+        }
+
         // 監聽驗證狀態變化，若重新整理時已登入則自動解鎖
         window.addEventListener('load', () => {
             setTimeout(() => {
@@ -2555,6 +2587,7 @@
             }
         }
 
+        // 修改後：請將上述範圍整段覆蓋替換為以下唯一的乾淨版本
         function showArchiveSuccessModal() {
             const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
             m.classList.remove('hidden'); m.classList.add('flex');
@@ -2579,7 +2612,7 @@
             currentInviteCode = "";
             myIdentity = "";
             records = [];
-            await dbClear('recordsStore');
+            if (typeof dbClear === 'function') await dbClear('recordsStore');
             updateHeaderTitle();
             renderAll();
             openDashboard();
@@ -2591,46 +2624,7 @@
             currentInviteCode = "";
             myIdentity = "";
             records = [];
-            await dbClear('recordsStore');
-            updateHeaderTitle();
-            renderAll();
-            openSettings();
-        }
-
-
-        function showArchiveSuccessModal() {
-            const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
-            m.classList.remove('hidden'); m.classList.add('flex');
-            requestAnimationFrame(() => { m.classList.remove('opacity-0'); c.classList.remove('scale-95'); c.classList.add('scale-100'); });
-        }
-
-        function hideArchiveSuccessModal() {
-            const m = document.getElementById('archiveSuccessModal'), c = document.getElementById('archiveSuccessContent');
-            m.classList.add('opacity-0'); c.classList.remove('scale-100'); c.classList.add('scale-95');
-            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
-        }
-
-        async function returnToDashboardAfterArchive() {
-            hideArchiveSuccessModal();
-            // 清空當前畫面殘留的舊專案狀態
-            currentTripId = "";
-            currentInviteCode = "";
-            myIdentity = "";
-            records = [];
-            await dbClear('recordsStore');
-            updateHeaderTitle();
-            renderAll();
-            openDashboard();
-        }
-
-        async function createNewTripAfterArchive() {
-            hideArchiveSuccessModal();
-            // 清空當前畫面殘留的舊專案狀態
-            currentTripId = "";
-            currentInviteCode = "";
-            myIdentity = "";
-            records = [];
-            await dbClear('recordsStore');
+            if (typeof dbClear === 'function') await dbClear('recordsStore');
             updateHeaderTitle();
             renderAll();
             openSettings();
