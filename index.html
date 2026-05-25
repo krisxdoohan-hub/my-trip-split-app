@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.1 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.2 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -1503,19 +1503,22 @@
             const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
             const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
             
-            // ✨ [修改] 智慧分流鎖定：若是一般親友，綁定後立刻隱藏面板；若是主揪，則不受此防呆限制，永久保留所有管理功能 ✨
+            // ✨ [修正] 徹底重新劃分介面權限：主揪保有全部權限，一般旅客固定顯示基礎必備功能 ✨
             const dbBlock = document.getElementById('setting-block-database');
-            if (dbBlock) dbBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
-            const tripBlock = document.getElementById('setting-block-trip');
-            if (tripBlock) tripBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
-            const idBlock = document.getElementById('setting-block-identity');
-            if (idBlock) idBlock.style.display = (isSetupComplete && !isOwner) ? 'none' : 'block';
+            if (dbBlock) dbBlock.style.display = isOwner ? 'block' : 'none';
             
-            // ✨ [新增] 獨立的更名區塊顯示邏輯：只要完成綁定，所有人（含親友與主揪）皆可看到更名功能 ✨
+            // 旅程專案設定：確保新成員可用以確認或手動輸入代碼
+            const tripBlock = document.getElementById('setting-block-trip');
+            if (tripBlock) tripBlock.style.display = 'block';
+            
+            // 本機身分綁定 & 修改專屬暱稱：嚴格規定任何人（包含剛註冊的旅客）都必須無條件看到這兩個區塊
+            const idBlock = document.getElementById('setting-block-identity');
+            if (idBlock) idBlock.style.display = 'block';
+            
             const nicknameBlock = document.getElementById('setting-block-nickname');
-            if (nicknameBlock) nicknameBlock.style.display = isSetupComplete ? 'block' : 'none';
+            if (nicknameBlock) nicknameBlock.style.display = 'block';
 
-            // ✨ [修正] 嚴格權限控管：人員管理與安全性設定，絕對僅限主揪可見，其餘狀態一律隱藏 ✨
+            // 人員管理 & 安全性設定：絕對僅限主揪可見，避免一般旅客誤按離隊
             const memBlock = document.getElementById('setting-block-members');
             if (memBlock) memBlock.style.display = isOwner ? 'block' : 'none';
             const secBlock = document.getElementById('setting-block-security');
