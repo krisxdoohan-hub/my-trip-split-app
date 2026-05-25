@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.2 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.3 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -453,7 +453,31 @@
         </div>
     </div>
 
+        <button onclick="createNewTripAfterArchive()" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-black py-4 rounded-2xl transition duration-200 active:scale-95 text-lg flex justify-center items-center gap-2 focus:outline-none">
+                    <i class="ph ph-plus-circle text-2xl"></i> 建立新旅程
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="forceOnboardingModal" class="fixed inset-0 bg-gray-900/95 backdrop-blur-md z-[9999] hidden flex-col justify-center items-center p-6 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-8 text-center flex flex-col gap-4">
+            <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto shadow-inner border border-indigo-100">
+                <i class="ph ph-user-focus text-3xl text-indigo-500"></i>
+            </div>
+            <h3 class="text-xl font-black text-gray-800 tracking-wide">歡迎加入旅程！</h3>
+            <p class="text-sm font-medium text-gray-500 mb-2 leading-relaxed">為確保分帳系統正常運作，<br>請務必輸入您的專屬姓名或暱稱。</p>
+            <input type="text" id="input-force-nickname" placeholder="請輸入姓名..." class="w-full border-gray-200 bg-gray-50 rounded-xl p-4 text-center text-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold text-gray-800 shadow-inner">
+            <button onclick="submitForceOnboarding()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl transition duration-200 shadow-lg shadow-indigo-200 active:scale-95 text-base focus:outline-none mt-2">
+                儲存並開始使用
+            </button>
+        </div>
+    </div>
     
+    <script>
+
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }    
+
     <script>
 
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }
@@ -1942,6 +1966,9 @@
                 renderSettingsMembers();
                 showSettingsMsg("雲端資料同步成功！");
 
+                // ✨ [新增] 執行防逃避強制引導檢查 ✨
+                checkAndForceOnboarding();
+
             } catch (error) {
                 console.error("forceSyncDownload 失敗:", error);
                 // permission-denied 代表尚未加入此旅程或 Security Rules 攔截
@@ -2090,12 +2117,8 @@
 
                                     await saveTripId(); // 自動呼叫既有的加入旅程功能
                                     sessionStorage.removeItem('tripSplit_pending_invite'); // 執行完畢後清除
-
-                                    // 延遲開啟設定面板，引導新使用者綁定自己的姓名
-                                    setTimeout(() => { 
-                                        openSettings(); 
-                                        alert("已透過專屬連結成功加入旅程！\n請在設定面板的「本機身分綁定」中選擇您的名字。"); 
-                                    }, 1000);
+                                    
+                                    // ✨ [修正] 移除舊的手動引導，改由 forceSyncDownload 自動觸發強制蓋台 ✨
                                 } catch (e) {
                                     console.error("處理深層連結失敗:", e);
                                 }
@@ -2105,6 +2128,60 @@
                 }
             }, 500); 
         });
+
+        // ✨ [新增] 防逃避攔截檢查函式 ✨
+        function checkAndForceOnboarding() {
+            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
+            const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
+            
+            // 條件：已在專案中 + 尚未綁定身分 + 不是主揪 ➔ 無處可逃強制蓋台
+            if (currentTripId && !myIdentity && !isOwner) {
+                const m = document.getElementById('forceOnboardingModal');
+                if (m) {
+                    m.classList.remove('hidden');
+                    m.classList.add('flex');
+                    requestAnimationFrame(() => m.classList.remove('opacity-0'));
+                }
+            }
+        }
+
+        // ✨ [新增] 一鍵自動生成並綁定身分函式 ✨
+        async function submitForceOnboarding() {
+            const newName = document.getElementById('input-force-nickname').value.trim();
+            if (!newName) { alert("請務必輸入姓名才能繼續使用系統！"); return; }
+            if (!currentTripId || !window.db) { alert("系統尚未就緒，請重整網頁。"); return; }
+            
+            showLoading("正在為您建立專屬身分...");
+            try {
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                if (!tripSnap.exists()) throw new Error("找不到旅程資料");
+                
+                const tripData = tripSnap.data();
+                const newMemberId = generateMemberId();
+                const joinDate = getLocalYMD(new Date());
+                
+                // 1. 自動寫入陣列，無須主揪介入
+                const updatedMembers = [...(tripData.members || []), { id: newMemberId, name: newName, joinDate: joinDate }];
+                const updatedMemberDetails = [...(tripData.memberDetails || []), { id: newMemberId, name: newName, join_date: joinDate }];
+                await window.fsUpdateDoc(tripRef, { members: updatedMembers, memberDetails: updatedMemberDetails });
+                
+                // 2. 本機強制完成身分綁定
+                myIdentity = newMemberId;
+                localStorage.setItem('tripSplit_myIdentity', myIdentity);
+                
+                // 3. 隱藏蓋台
+                const m = document.getElementById('forceOnboardingModal');
+                m.classList.add('opacity-0');
+                setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 300);
+                
+                // 4. 重新同步，讓全系統認識這個新身分
+                forceSyncDownload(); 
+            } catch(e) {
+                alert("建立失敗：" + e.message);
+                hideLoading();
+            }
+        }
 
         function unlockApp() {            const overlay = document.getElementById('lock-screen');
             overlay.classList.add('opacity-0', 'pointer-events-none');
