@@ -408,7 +408,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.4 多人旅遊分帳-裝置同步版
+                System Version: v0.0.0.9.5 多人旅遊分帳-裝置同步版
             </div>
         </div>
     </div>
@@ -810,6 +810,9 @@
                     fab.classList.add('flex');
                 }
             }
+
+            // ✨ [修正] 將防逃避檢查綁定至全域渲染週期，確保任何狀態下都無法繞過 ✨
+            checkAndForceOnboarding();
         }
 
         function renderHeader() {
@@ -1955,9 +1958,6 @@
                 renderSettingsMembers();
                 showSettingsMsg("雲端資料同步成功！");
 
-                // ✨ [新增] 執行防逃避強制引導檢查 ✨
-                checkAndForceOnboarding();
-
             } catch (error) {
                 console.error("forceSyncDownload 失敗:", error);
                 // permission-denied 代表尚未加入此旅程或 Security Rules 攔截
@@ -2090,6 +2090,9 @@
                             }
 
                             unlockApp();
+                            
+                            // ✨ [修正] 登入解鎖後，第一時間攔截並觸發強制綁定檢查 ✨
+                            checkAndForceOnboarding();
 
                             // ✨ [新增] 檢查 sessionStorage 是否有待處理的深層連結邀請 ✨
                             const pendingInvite = sessionStorage.getItem('tripSplit_pending_invite');
@@ -2120,9 +2123,10 @@
 
         // ✨ [新增] 防逃避攔截檢查函式 ✨
         function checkAndForceOnboarding() {
-            // 💡 修正：全面拔除「主揪 (isOwner)」的豁免權。
-            // 條件：只要已進入專案 + 尚未綁定本機身分 (myIdentity) ➔ 任何人一律強制蓋台
-            if (currentTripId && !myIdentity) {
+            const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
+            
+            // 💡 修正：必須「確認已登入」且「已進入專案」且「尚未綁定身分」才蓋台，避免覆蓋最初的登入畫面
+            if (currentUser && currentTripId && !myIdentity) {
                 const m = document.getElementById('forceOnboardingModal');
                 if (m) {
                     m.classList.remove('hidden');
