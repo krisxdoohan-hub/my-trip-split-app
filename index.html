@@ -412,7 +412,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.13 多人旅遊分帳-登出版
+                System Version: v0.0.0.9.14 多人旅遊分帳-登出版
             </div>
         </div>
     </div>
@@ -1565,12 +1565,18 @@
             const sel = document.getElementById('cfg-my-identity');
             if (!sel) return;
             let html = '<option value="">-- 請選擇您的身分 --</option>';
+            // 取得當下登入者的 UID
+            const currentUserUid = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser.uid : null;
             // ✨ [修改] members 陣列內的元素改為支援物件 (m.id 與 m.name) ✨
             members.forEach(m => {
                 const memberId = m.id || m; // 兼容舊版純字串
                 const memberName = m.name || m;
+                // 核心修復：檢查是否已被「其他人」綁定
+                const isBoundByOther = m.boundUid && m.boundUid !== currentUserUid;
+                const disabledAttr = isBoundByOther ? 'disabled' : '';
+                const displaySuffix = isBoundByOther ? ' 🔒(已被綁定)' : '';
                 // value 綁定 UUID，畫面顯示 name
-                html += `<option value="${memberId}" ${myIdentity === memberId ? 'selected' : ''}>${memberName}</option>`;
+                html += `<option value="${memberId}" ${myIdentity === memberId ? 'selected' : ''} ${disabledAttr}>${memberName}${displaySuffix}</option>`;
             });
             sel.innerHTML = html;
         }
@@ -1596,6 +1602,32 @@
             // ✨ [核心修復] 手動綁定後也必須寫回雲端
             if (window.firebaseAuth && window.firebaseAuth.currentUser) {
                 const uid = window.firebaseAuth.currentUser.uid;
+                
+                // 核心防護：將綁定標籤 (boundUid) 寫回中央專案，防止其他人再次綁定
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                if (tripSnap.exists()) {
+                    const tripData = tripSnap.data();
+                    const existingMembers = tripData.members || [];
+                    
+                    // 再次驗證是否在操作期間被別人搶走
+                    const targetMem = existingMembers.find(m => (m.id || m) === selectedValue);
+                    if (targetMem && targetMem.boundUid && targetMem.boundUid !== uid) {
+                        alert("慢了一步！此身分剛剛已被其他帳號綁定，請重新選擇。");
+                        forceSyncDownload();
+                        return;
+                    }
+                    
+                    // 更新陣列，掛上自己的 UID
+                    const updatedMembers = existingMembers.map(m => {
+                        if ((m.id || m) === selectedValue) {
+                            return typeof m === 'string' ? { id: m, name: m, boundUid: uid } : { ...m, boundUid: uid };
+                        }
+                        return m;
+                    });
+                    await window.fsUpdateDoc(tripRef, { members: updatedMembers });
+                }
+
                 const userRef = window.fsDoc(window.db, 'users', uid);
                 const userSnap = await window.fsGetDoc(userRef);
                 if (userSnap.exists()) {
@@ -2242,26 +2274,41 @@
                     isNewUid = true;
                 }
                 
+                let finalUpdatedMembers = existingMembers;
+
                 if (existingMember) {
-                    // 若存在同名，直接綁定現有身分，不重複創建
+                    // 核心防護：攔截輸入別人已經綁定的名字
+                    if (existingMember.boundUid && existingMember.boundUid !== uid) {
+                        alert(`「${newName}」已被其他帳號綁定，請輸入其他名稱！`);
+                        hideLoading();
+                        return;
+                    }
+                    
+                    // 若存在同名且未被綁定，直接綁定現有身分，不重複創建
                     targetMemberId = existingMember.id || existingMember;
                     
-                    // 核心修復 1：就算綁定舊身分，也必須把新設備(新帳號)的 UID 補登入 memberUids，否則永遠沒權限！
-                    if (isNewUid) {
-                        await window.fsUpdateDoc(tripRef, { memberUids: updatedMemberUids });
-                    }
+                    // 將現有身分打上自己的標籤
+                    finalUpdatedMembers = existingMembers.map(m => 
+                        (m.id || m) === targetMemberId ? { ...(typeof m === 'string' ? {id:m, name:m} : m), boundUid: uid } : m
+                    );
+                    
+                    // 核心修復 1：就算綁定舊身分，也必須把新設備(新帳號)的 UID 補登入 memberUids，並寫入標籤
+                    await window.fsUpdateDoc(tripRef, { 
+                        memberUids: updatedMemberUids,
+                        members: finalUpdatedMembers
+                    });
                 } else {
-                    // 若不存在，建立全新身分
+                    // 若不存在，建立全新身分並直接打上綁定標籤
                     targetMemberId = generateMemberId();
                     const joinDate = getLocalYMD(new Date());
-                    const updatedMembers = [...existingMembers, { id: targetMemberId, name: newName, joinDate: joinDate }];
+                    finalUpdatedMembers = [...existingMembers, { id: targetMemberId, name: newName, joinDate: joinDate, boundUid: uid }];
                     const updatedMemberDetails = [...(tripData.memberDetails || []), { id: targetMemberId, name: newName, join_date: joinDate }];
 
                     // 核心修復 2：必須將 UID 與 Members 在「同一秒鐘」合併送出！
                     // 若分兩步送出，第二步會被 Firestore【條款一】以「已是成員但企圖增加人數」為由無情阻擋。
                     await window.fsUpdateDoc(tripRef, {
                         memberUids: updatedMemberUids,
-                        members: updatedMembers,
+                        members: finalUpdatedMembers,
                         memberDetails: updatedMemberDetails
                     });
                 }
@@ -2321,7 +2368,8 @@
         members = [];
         records = [];
 
-        renderAll();
+        // 核心修復：強制重新整理網頁，徹底洗淨全域變數、記憶體與 DOM 殘留狀態，100% 乾淨返回登入畫面
+        window.location.reload();
 
     } catch (e) {
         console.error(e);
