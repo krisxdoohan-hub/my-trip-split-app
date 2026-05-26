@@ -412,7 +412,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.11 多人旅遊分帳-登出版
+                System Version: v0.0.0.9.12 多人旅遊分帳-登出版
             </div>
         </div>
     </div>
@@ -2236,8 +2236,29 @@
                     targetMemberId = generateMemberId();
                     const joinDate = getLocalYMD(new Date());
                     const updatedMembers = [...existingMembers, { id: targetMemberId, name: newName, joinDate: joinDate }];
-                    const updatedMemberDetails = [...(tripData.memberDetails || []), { id: targetMemberId, name: newName, join_date: joinDate }];
-                    await window.fsUpdateDoc(tripRef, { members: updatedMembers, memberDetails: updatedMemberDetails });
+const updatedMemberDetails = [...(tripData.memberDetails || []), { id: targetMemberId, name: newName, join_date: joinDate }];
+
+// 先把 UID 加入 memberUids
+const updatedMemberUids = [...(tripData.memberUids || [])];
+
+if (window.firebaseAuth && window.firebaseAuth.currentUser) {
+    const uid = window.firebaseAuth.currentUser.uid;
+
+    if (!updatedMemberUids.includes(uid)) {
+        updatedMemberUids.push(uid);
+    }
+}
+
+// STEP 1：先寫入 memberUids
+await window.fsUpdateDoc(tripRef, {
+    memberUids: updatedMemberUids
+});
+
+// STEP 2：再寫入 members/memberDetails
+await window.fsUpdateDoc(tripRef, {
+    members: updatedMembers,
+    memberDetails: updatedMemberDetails
+});
                 }
                 
                 // 2. 本機強制完成身分綁定
@@ -2279,49 +2300,29 @@
         }
 
         async function handleFirebaseLogout() {
-            if (!window.firebaseAuth) return;
-            try {
-                showLoading("登出中...");
-                await window.signOut(window.firebaseAuth);
-                
-                // 清除暫存變數與陣列
-                currentTripId = "";
-                currentInviteCode = "";
-                myIdentity = "";
-                records = [];
-                members = [];
-                window.currentPublicPayers = [];
-                window.memberDetailsList = [];
-                window.currentTripOwnerUid = "";
-                window.currentTripIsClosed = false;
-                if (typeof dbClear === 'function') await dbClear('recordsStore');
-                
-                // ✨【快取徹底清洗】防堵換帳號時快取殘留污染，徹底抹除舊旅程與身分紀錄
-                localStorage.removeItem('tripSplit_tripId');
-                localStorage.removeItem('tripSplit_inviteCode');
-                localStorage.removeItem('tripSplit_myIdentity');
-                sessionStorage.removeItem('tripSplit_pending_invite');
-                
-                // 恢復未登入畫面的輸入狀態
-                document.getElementById('fb-email').value = "";
-                document.getElementById('fb-password').value = "";
-                document.getElementById('fb-error-msg').style.opacity = '0';
-                
-                // 重新顯示鎖定畫面
-                const overlay = document.getElementById('lock-screen');
-                overlay.classList.remove('hidden');
-                requestAnimationFrame(() => {
-                    overlay.classList.remove('opacity-0', 'pointer-events-none');
-                    overlay.style.transform = "scale(1)";
-                });
-                
-                hideLoading();
-            } catch (error) {
-                console.error("登出失敗", error);
-                alert("登出失敗：" + error.message);
-                hideLoading();
-            }
-        }
+    try {
+        await window.signOut(window.firebaseAuth);
+
+        // 清除本地登入狀態
+        myIdentity = "";
+        currentTripId = "";
+        currentInviteCode = "";
+
+        localStorage.removeItem('tripSplit_myIdentity');
+        localStorage.removeItem('tripSplit_tripId');
+        localStorage.removeItem('tripSplit_inviteCode');
+
+        // 清空資料
+        members = [];
+        records = [];
+
+        renderAll();
+
+    } catch (e) {
+        console.error(e);
+        alert("登出失敗：" + e.message);
+    }
+}
 
         // ✨ [新增] 控制系統救援彈窗與密碼重置的專屬函式 ✨
         function openRecoveryModal() {
