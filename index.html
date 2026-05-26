@@ -412,7 +412,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.9 多人旅遊分帳-登出版
+                System Version: v0.0.0.9.10 多人旅遊分帳-登出版
             </div>
         </div>
     </div>
@@ -2295,6 +2295,11 @@
                 members = [];
                 window.currentPublicPayers = [];
                 if (typeof dbClear === 'function') await dbClear('recordsStore');
+                
+                // ✨【快取徹底清洗】防堵換帳號時快取殘留污染，徹底抹除舊旅程與身分紀錄
+                localStorage.removeItem('tripSplit_tripId');
+                localStorage.removeItem('tripSplit_inviteCode');
+                localStorage.removeItem('tripSplit_myIdentity');
                 
                 // 恢復未登入畫面的輸入狀態
                 document.getElementById('fb-email').value = "";
