@@ -412,7 +412,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.12 多人旅遊分帳-登出版
+                System Version: v0.0.0.9.13 多人旅遊分帳-登出版
             </div>
         </div>
     </div>
@@ -1914,7 +1914,12 @@
                 document.getElementById('cfg-invite-code').value = '';
 
                 hideLoading();
-                forceSyncDownload(); // 觸發下載最新旅程資料
+                
+                // 核心修復 3：如果是新帳號加入(尚未取名綁定)，此時尚未取得 transaction 權限，
+                // 必須暫停 forceSyncDownload 避免背景跳出紅字錯誤，等蓋台取名完成後自然會觸發下載。
+                if (myIdentity) {
+                    forceSyncDownload(); 
+                }
 
             } catch (error) {
                 console.error("旅程建立/加入失敗:", error);
@@ -2228,37 +2233,37 @@
                 let targetMemberId = null;
                 const existingMember = existingMembers.find(m => (m.name || m) === newName);
                 
+                // 統一取得最新 UID 狀態
+                const updatedMemberUids = [...(tripData.memberUids || [])];
+                const uid = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser.uid : null;
+                let isNewUid = false;
+                if (uid && !updatedMemberUids.includes(uid)) {
+                    updatedMemberUids.push(uid);
+                    isNewUid = true;
+                }
+                
                 if (existingMember) {
                     // 若存在同名，直接綁定現有身分，不重複創建
                     targetMemberId = existingMember.id || existingMember;
+                    
+                    // 核心修復 1：就算綁定舊身分，也必須把新設備(新帳號)的 UID 補登入 memberUids，否則永遠沒權限！
+                    if (isNewUid) {
+                        await window.fsUpdateDoc(tripRef, { memberUids: updatedMemberUids });
+                    }
                 } else {
                     // 若不存在，建立全新身分
                     targetMemberId = generateMemberId();
                     const joinDate = getLocalYMD(new Date());
                     const updatedMembers = [...existingMembers, { id: targetMemberId, name: newName, joinDate: joinDate }];
-const updatedMemberDetails = [...(tripData.memberDetails || []), { id: targetMemberId, name: newName, join_date: joinDate }];
+                    const updatedMemberDetails = [...(tripData.memberDetails || []), { id: targetMemberId, name: newName, join_date: joinDate }];
 
-// 先把 UID 加入 memberUids
-const updatedMemberUids = [...(tripData.memberUids || [])];
-
-if (window.firebaseAuth && window.firebaseAuth.currentUser) {
-    const uid = window.firebaseAuth.currentUser.uid;
-
-    if (!updatedMemberUids.includes(uid)) {
-        updatedMemberUids.push(uid);
-    }
-}
-
-// STEP 1：先寫入 memberUids
-await window.fsUpdateDoc(tripRef, {
-    memberUids: updatedMemberUids
-});
-
-// STEP 2：再寫入 members/memberDetails
-await window.fsUpdateDoc(tripRef, {
-    members: updatedMembers,
-    memberDetails: updatedMemberDetails
-});
+                    // 核心修復 2：必須將 UID 與 Members 在「同一秒鐘」合併送出！
+                    // 若分兩步送出，第二步會被 Firestore【條款一】以「已是成員但企圖增加人數」為由無情阻擋。
+                    await window.fsUpdateDoc(tripRef, {
+                        memberUids: updatedMemberUids,
+                        members: updatedMembers,
+                        memberDetails: updatedMemberDetails
+                    });
                 }
                 
                 // 2. 本機強制完成身分綁定
