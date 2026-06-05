@@ -412,7 +412,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                System Version: v0.0.0.9.14 多人旅遊分帳-登出版
+                System Version: v0.0.0.9.15 多人旅遊分帳-登出版
             </div>
         </div>
     </div>
@@ -580,7 +580,7 @@
         let myIdentity = localStorage.getItem('tripSplit_myIdentity') || ""; // ✨ [新增] 身分綁定變數 ✨
         // ✨ [修改] 強制寫死最新的 GAS 網址，徹底排除本機舊快取的干擾 ✨
         let gasApiUrl = "https://script.google.com/macros/s/AKfycbznfBaBDPs0q9aN9q-Egg00xk1IZv6eJwpZBXkQRHeK_88yenbGGQuvFedOUg9Qfy_neg/exec";
-        
+        let auditGasUrl = "https://script.google.com/macros/s/AKfycbwmxNjrzJBGnH98Y7vXo9tNSbG_Nu91zCJhFS2OtFDiO_AeuEfDJfH-CnC-AsPW3HRv/exec"; // ✨ [新增] 稽核日誌專用 API 網址 ✨
         
         // ✨ [新增] 動態旅遊成員名單與 UI 渲染函數 ✨
         let members = []; // 預設名單，未來會透過 API 從雲端試算表的 Members 分頁動態同步下載
@@ -1290,6 +1290,10 @@
                     successIds.push(queueItem.id);
                 } catch (err) {
                     console.error("佇列項目處理失敗，稍後重試:", err);
+                    if (err.code === 'permission-denied') {
+                        alert("⚠️ 離線同步攔截：您在離線時編輯的某筆紀錄已被其他人修改過，為保護最新資料，已放棄覆蓋。請檢閱最新帳目！");
+                        successIds.push(queueItem.id); // 放棄此筆，讓它從佇列移除
+                    }
                     // 單筆失敗不中斷，繼續處理下一筆
                 }
             }
@@ -1326,6 +1330,29 @@
             if (navigator.onLine) {
                 processSyncQueue();
             }
+        }
+
+        // ✨ [新增] 發送歷史稽核日誌至 Google Sheets 專用函數 ✨
+        function sendAuditLog(action, record) {
+            if (!auditGasUrl || auditGasUrl.includes("請在此貼上")) return;
+            const currentUserUid = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser.uid : '未登入';
+            const logData = {
+                actionType: 'audit',
+                action: action,
+                operatorName: myIdentity || '未知使用者',
+                operatorUid: currentUserUid,
+                recordId: record.id,
+                tripId: record.trip_id || currentTripId,
+                amount: record.amount || 0,
+                currency: record.currency || '',
+                category: record.category || '',
+                note: record.note || ''
+            };
+            
+            fetch(auditGasUrl, {
+                method: 'POST',
+                body: JSON.stringify(logData)
+            }).catch(e => console.error("稽核日誌發送失敗:", e));
         }
 
         // ✨ [修改] 升級為非同步函數，並將資料發送至 Google Sheets ✨
@@ -1367,9 +1394,9 @@
 
             const recordId = editingRecordId || Date.now().toString();
             
-            // ✨ [新增] 讀取本機目前的版本號，若無則預設為 1 ✨
+            // ✨ [新增] 讀取本機目前的版本號，若無則預設為 0 ✨
             const existingRecord = editingRecordId ? records.find(r => String(r.id) === String(editingRecordId)) : null;
-            const currentRev = existingRecord && existingRecord.rev ? existingRecord.rev : 1;
+            const currentRev = existingRecord && existingRecord.rev ? existingRecord.rev : 0;
 
             // ─── ✨ [新增] 動態產生活躍成員快照 (Active Member Snapshot) ✨ ───
             let snapshotList = [];
@@ -1433,7 +1460,7 @@
                         alert("網路或伺服器錯誤，圖片暫不備份：" + err.message);
                     }
                     hideLoading();
-                }
+               }
             } else if (editingRecordId) {
                 // 編輯模式下，若未更換圖片，繼承原本的 url
                 const oldRecord = records.find(r => r.id === editingRecordId);
@@ -1452,7 +1479,7 @@
                 total_amount: parseFloat(a), 
                 amount: parseFloat(a), 
                 currency: curr,
-                rev: currentRev, // ✨ [新增] 將版本控制號夾帶至資料包中 ✨
+                rev: editingRecordId ? currentRev + 1 : 1, // ✨ [修改] 編輯時強制遞增版本號，防呆覆蓋 ✨
                 member_snapshot: snapshotList, // ✨ [新增] 將快照陣列寫入物件 ✨
                 receipt_image: finalReceiptImage, // 若未上傳成功，短暫保留供本機顯示
                 receipt_url: finalReceiptUrl // ✨ [新增] 存入 Google Drive 產生的真實網址 ✨
@@ -1477,13 +1504,21 @@
                     hasUnsyncedChanges = false;
                     updateCloudIcon('success');
                     showSettingsMsg(editingRecordId ? "已更新至 Firestore" : "已新增至 Firestore");
+                    // ✨ [新增] 寫入成功後，發送稽核日誌至 Google Sheets ✨
+                    sendAuditLog(editingRecordId ? '修改紀錄' : '新增紀錄', newRecord);
                 } else {
                     // 離線：加入佇列，等待網路恢復後補送
                     await enqueueSyncItem({ ...newRecord, action: 'save' });
                 }
             } catch (error) {
-                console.error("Firestore 寫入失敗，降級至離線佇列:", error);
-                await enqueueSyncItem({ ...newRecord, action: 'save' });
+                console.error("Firestore 寫入失敗:", error);
+                if (error.code === 'permission-denied') {
+                    alert("⚠️ 儲存失敗：此筆資料剛剛已被其他成員修改過！\n系統將為您自動重新下載最新資料，請重新檢閱後再修改。");
+                    forceSyncDownload(); // 立即覆蓋本機錯誤快取
+                } else {
+                    // 網路異常等非權限問題，降級至離線佇列
+                    await enqueueSyncItem({ ...newRecord, action: 'save' });
+                }
             }
         }
 
@@ -1504,6 +1539,8 @@
                     hasUnsyncedChanges = false;
                     updateCloudIcon('success');
                     showSettingsMsg("已從 Firestore 刪除");
+                    // ✨ [新增] 刪除成功後，發送稽核日誌至 Google Sheets ✨
+                    sendAuditLog('刪除紀錄', { id: targetId, trip_id: currentTripId });
                 } else {
                     await enqueueSyncItem({ id: targetId, action: 'delete' });
                 }
