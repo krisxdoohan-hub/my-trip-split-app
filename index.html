@@ -1734,16 +1734,19 @@
                 list.innerHTML = '<p class="text-[10px] text-rose-700">目前無活躍成員可供結算。</p>';
                 return;
             }
-            let html = '<p class="text-[10px] text-rose-700 leading-tight mb-3">點擊離隊後，系統將封存其歷史紀錄，不再參與未來的新增分攤。</p>';
+            let html = '<p class="text-[10px] text-rose-700 leading-tight mb-3">點擊離隊後，系統將封存其歷史紀錄，不再參與未來的新增分攤。若是誤創人員請點擊刪除。</p>';
             // ✨ [修改] members 陣列內的元素改為支援物件 (m.id 與 m.name) ✨
             members.forEach(m => {
                 const memberId = m.id || m; // 兼容舊版純字串
                 const memberName = m.name || m;
-                // ✨ [修改] 顯示 name，但按鈕的 checkoutMember 參數改傳遞 UUID ✨
+                // ✨ [修改] 顯示 name，新增刪除按鈕，且按鈕的參數改傳遞 UUID ✨
                 html += `
                 <div class="flex justify-between items-center bg-white border border-rose-200 p-2 rounded-lg shadow-sm">
                     <span class="text-sm font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-user text-rose-400"></i> ${memberName}</span>
-                    <button onclick="checkoutMember('${memberId}')" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold transition active:scale-95">結清離隊</button>
+                    <div class="flex gap-2">
+                        <button onclick="deleteMember('${memberId}')" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold transition active:scale-95">刪除</button>
+                        <button onclick="checkoutMember('${memberId}')" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold transition active:scale-95">結清離隊</button>
+                    </div>
                 </div>`;
             });
             list.innerHTML = html;
@@ -1854,6 +1857,56 @@
                     showSettingsMsg("權限不足：只有旅程擁有者可執行此操作", false);
                 } else {
                     showSettingsMsg("操作失敗：" + error.message, false);
+                }
+                updateCloudIcon('error');
+            }
+        }
+
+        // ✨ [新增] 徹底刪除成員：適用於誤創、尚未有任何帳務紀錄的成員 ✨
+        async function deleteMember(memberId) {
+            const memberObj = members.find(m => (m.id || m) === memberId);
+            const displayName = memberObj ? (memberObj.name || memberObj) : memberId;
+
+            if (!confirm(`確定要徹底刪除「${displayName}」嗎？\n⚠️ 警告：若該成員已有參與任何分帳紀錄，刪除後將導致帳本計算錯誤！\n(如果有帳務，請改用「結清離隊」)`)) return;
+            if (!window.db) { showSettingsMsg("Firestore 尚未就緒", false); return; }
+
+            showSettingsMsg(`正在徹底刪除 ${displayName} 的資料...`);
+            updateCloudIcon('unsynced');
+
+            try {
+                const tripRef = window.fsDoc(window.db, 'trips', currentTripId);
+                const tripSnap = await window.fsGetDoc(tripRef);
+                if (!tripSnap.exists()) { showSettingsMsg("旅程文件不存在", false); return; }
+
+                const tripData = tripSnap.data();
+
+                // 從 members 陣列中完全移除
+                const updatedMembers = (tripData.members || []).filter(m => {
+                    const mId = m.id || m;
+                    const mName = m.name || m;
+                    return mId !== memberId && mName !== memberId;
+                });
+
+                // 同步從 memberDetails 陣列中移除
+                const updatedMemberDetails = (tripData.memberDetails || []).filter(md => {
+                    return md.id !== memberId && md.name !== memberId;
+                });
+
+                await window.fsUpdateDoc(tripRef, { 
+                    members: updatedMembers,
+                    memberDetails: updatedMemberDetails
+                });
+
+                showSettingsMsg(`${displayName} 已徹底刪除！`);
+                updateCloudIcon('success');
+                forceSyncDownload(); // 重新下載刷新清單
+
+            } catch (error) {
+                console.error("Firestore 刪除成員失敗:", error);
+                if (error.code === 'permission-denied') {
+                    showSettingsMsg("權限不足：只有旅程擁有者可執行此操作", false);
+                } else {
+                    showSettingsMsg("刪除失敗：" + error.message, false);
                 }
                 updateCloudIcon('error');
             }
