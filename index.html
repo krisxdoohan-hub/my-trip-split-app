@@ -6,7 +6,7 @@
     <title>旅遊分帳記帳本 </title>
     <link rel="manifest" href="manifest.json">
     <script>
-        const APP_VERSION = 'v0.0.0.0.5 - 強化搜尋功能';
+        const APP_VERSION = 'v0.0.0.0.6 - 修正快捷列BUG';
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
@@ -167,7 +167,7 @@
         .feature-item { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-main); text-decoration: none; outline: none; }
         
         /* 修改這裡的樣式，以符合 EMOJI 風格 */
-        .feature-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;}
+        .feature-icon { pointer-events: none; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;}
         
         /* 為每個圖標設置特定的徑向漸變背景 */
         .feature-item[onclick*="switchPage('record')"] .feature-icon { background: radial-gradient(circle at 50% 50%, #fde68a, #f9a8d4); } /* 金色到粉色 */
@@ -182,7 +182,7 @@
         /* 為 img 設置大小 */
         .feature-icon img { width: 28px; height: 28px; object-fit: contain; }
         
-        .feature-item span { font-size: 12px; font-weight: 500; }
+        .feature-item span { pointer-events: none; font-size: 12px; font-weight: 500; }
 
         /* 底部導覽列 */
         .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--white); border-top-left-radius: 24px; border-top-right-radius: 24px; display: flex; justify-content: space-around; align-items: center; padding: 12px 0 calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.05); z-index: 50; }
@@ -2784,6 +2784,7 @@
             await dbPut('recordsStore', newRecord); // 本地 IndexedDB 快取
             closeAddModal();
             renderAll();
+            renderHistory(); // 確保紀錄列表即時更新
 
             // ✨ [修改] 直接寫入 Firestore，離線或失敗時自動降級進佇列 ✨
             updateCloudIcon('unsynced');
@@ -2819,6 +2820,7 @@
             await dbDelete('recordsStore', targetId); // 本地 IndexedDB 刪除
             closeAddModal();
             renderAll();
+            renderHistory(); // 確保紀錄列表即時更新
 
             // ✨ [修改] 直接從 Firestore 刪除，離線或失敗時自動降級進佇列 ✨
             updateCloudIcon('unsynced');
