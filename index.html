@@ -6,7 +6,7 @@
     <title>旅遊分帳記帳本 </title>
     <link rel="manifest" href="manifest.json">
     <script>
-        const APP_VERSION = 'v0.0.0.0.6 - 修正快捷列BUG';
+        const APP_VERSION = 'v0.0.0.0.7 - 修正快捷列BUG';
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
@@ -3057,7 +3057,7 @@
             document.getElementById('page-dashboard').style.display = 'none';
             document.getElementById('page-record').style.display = 'none';
 
-            // 更新底部導覽列狀態：熄滅首頁與紀錄，亮起「我的」
+            // 更新底部導覽列狀態：熄滅所有標籤 (設定頁並非底部導覽的項目)
             document.getElementById('nav-home').classList.remove('active');
             document.getElementById('nav-record').classList.remove('active');
             document.getElementById('nav-home').style.color = '#dcdde1';
@@ -3065,8 +3065,8 @@
             
             const navItems = document.querySelectorAll('.bottom-nav .nav-item');
             if (navItems.length > 3) {
-                navItems[3].classList.add('active');
-                navItems[3].style.color = 'var(--primary)';
+                navItems[3].classList.remove('active');
+                navItems[3].style.color = '#dcdde1';
             }
 
             const m = document.getElementById('settingsModal');
@@ -4314,6 +4314,33 @@
             const currentUser = window.firebaseAuth ? window.firebaseAuth.currentUser : null;
             const isOwner = currentUser && window.currentTripOwnerUid && (currentUser.uid === window.currentTripOwnerUid);
             const isSetupComplete = (currentTripId !== "" && myIdentity !== "");
+
+            // 強制關閉其他所有全螢幕 Modal 頁面，避免畫面重疊
+            const modalsToClose = ['tripOverviewModal', 'settingsModal', 'systemSettingsModal', 'dashboardModal', 'addRecordModal'];
+            modalsToClose.forEach(id => {
+                const modal = document.getElementById(id);
+                if (modal && !modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    modal.classList.add('opacity-0');
+                }
+            });
+
+            // 隱藏底層的首頁與紀錄頁
+            document.getElementById('page-dashboard').style.display = 'none';
+            document.getElementById('page-record').style.display = 'none';
+
+            // 更新底部導覽列狀態：熄滅首頁與紀錄，亮起「結算」
+            document.getElementById('nav-home').classList.remove('active');
+            document.getElementById('nav-record').classList.remove('active');
+            document.getElementById('nav-home').style.color = '#dcdde1';
+            document.getElementById('nav-record').style.color = '#dcdde1';
+            
+            const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+            if (navItems.length > 3) {
+                navItems[3].classList.add('active');
+                navItems[3].style.color = 'var(--primary)';
+            }
 
             calculateSettlement();
             const m = document.getElementById('settlementModal');
