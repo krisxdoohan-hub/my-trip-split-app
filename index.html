@@ -6,7 +6,7 @@
     <title>旅遊分帳記帳本 </title>
     <link rel="manifest" href="manifest.json">
     <script>
-        const APP_VERSION = 'v0.0.0.0.7 - 修正快捷列BUG';
+        const APP_VERSION = 'v0.0.0.0.8 - 修正收支計算BUG';
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
@@ -2484,7 +2484,7 @@
                 iBtn.className = "flex-1 py-1.5 text-sm font-bold rounded-lg transition-all bg-white text-emerald-500 shadow-sm";
                 eBtn.className = "flex-1 py-1.5 text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-[#5bbce4]";
                 accGroup.classList.remove('hidden'); // 解除收入隱藏帳戶的限制
-                participantsRow.classList.add('hidden'); // 但隱藏分攤名單
+                participantsRow.classList.remove('hidden'); // 解開收入隱藏分攤名單的限制
                 payerLabel.innerText = "交款人："; // 改名以符合公費情境
                 
                 // 變更主題色為收入綠色
@@ -2649,10 +2649,11 @@
             let payer = payerSel ? payerSel.value : '公費';
             let participantsStr = '';
             
+            // 統一擷取勾選的分攤名單（不分支出或收入）
+            const checkedBoxes = document.querySelectorAll('#input-participants input[type="checkbox"]:checked');
+            let parts = Array.from(checkedBoxes).map(cb => cb.value);
+            
             if (currentModalRecordType === 'expense') {
-                const checkedBoxes = document.querySelectorAll('#input-participants input[type="checkbox"]:checked');
-                let parts = Array.from(checkedBoxes).map(cb => cb.value);
-                
                 // ✨ [修復1] 若未勾選任何分攤對象，且付款人為特定成員時，自動切換為「私人自費模式」（分攤者僅有付款人自己） ✨
                 if (parts.length === 0) {
                     if (payer !== '公費' && payer !== '系統入帳') {
@@ -2662,7 +2663,6 @@
                         return; 
                     }
                 }
-                participantsStr = parts.join(','); // 將陣列轉為逗號分隔字串
             } else if (currentModalRecordType === 'income' && mCat === '公費') {
                 // 收入情境防呆：禁止選擇公費自己付給自己
                 if (payer === '公費' || payer === '系統入帳') {
@@ -2670,6 +2670,7 @@
                     return;
                 }
             }
+            participantsStr = parts.join(','); // 將陣列轉為逗號分隔字串
 
             if (!d || !a || parseFloat(a) <= 0) { alert("請輸入正確金額與日期"); return; }
 
@@ -2749,7 +2750,8 @@
             }
 
             let customSplitsStr = null;
-            if (currentModalRecordType === 'expense' && currentCustomSplits) {
+            // 移除只能在支出模式存檔的限制，讓收入也能儲存自訂分攤金額
+            if (currentCustomSplits) {
                 customSplitsStr = JSON.stringify(currentCustomSplits);
             }
 
@@ -4457,17 +4459,61 @@
                         totalPublicContributions += r.amount;
                     } else {
                         otherPublicIncome += r.amount;
-                        const snapshot = (r.member_snapshot && r.member_snapshot.length > 0) ? r.member_snapshot : fallbackPool;
-                        const splitAmt = r.amount / snapshot.length;
-                        snapshot.forEach(p => { publicLedger[p] = (publicLedger[p] || 0) + splitAmt; });
+                        
+                        // 套用統一計算順序
+                        let customSplits = null;
+                        if (r.custom_splits) {
+                            try { customSplits = JSON.parse(r.custom_splits); } catch(e) {}
+                        }
+
+                        if (customSplits) {
+                            // 1. 若有自訂金額，退給指定的人
+                            Object.keys(customSplits).forEach(p => {
+                                publicLedger[p] = (publicLedger[p] || 0) + (customSplits[p] || 0);
+                            });
+                        } else if (r.participants) {
+                            // 2. 若無自訂金額，退給勾選參與的人
+                            let parts = String(r.participants).split(',').map(p => p.trim()).filter(Boolean);
+                            if (parts.length > 0) {
+                                const splitAmt = r.amount / parts.length;
+                                parts.forEach(p => { publicLedger[p] = (publicLedger[p] || 0) + splitAmt; });
+                            }
+                        } else {
+                            // 3. 預設防呆：退給當時的所有活躍成員
+                            const snapshot = (r.member_snapshot && r.member_snapshot.length > 0) ? r.member_snapshot : fallbackPool;
+                            const splitAmt = r.amount / snapshot.length;
+                            snapshot.forEach(p => { publicLedger[p] = (publicLedger[p] || 0) + splitAmt; });
+                        }
                     }
                 });
 
                 records.filter(r => r.currency === curr && r.type === 'expense' && r.payer === '公費').forEach(r => {
                     publicExpense += r.amount;
-                    const snapshot = (r.member_snapshot && r.member_snapshot.length > 0) ? r.member_snapshot : fallbackPool;
-                    const splitAmt = r.amount / snapshot.length;
-                    snapshot.forEach(p => { publicLedger[p] = (publicLedger[p] || 0) - splitAmt; });
+                    
+                    // 嘗試解析該筆公費支出是否有自訂分攤金額設定
+                    let customSplits = null;
+                    if (r.custom_splits) {
+                        try { customSplits = JSON.parse(r.custom_splits); } catch(e) {}
+                    }
+
+                    if (customSplits) {
+                        // 1. 若有自訂分攤，優先依自訂金額從公費帳戶中各別扣除
+                        Object.keys(customSplits).forEach(p => {
+                            publicLedger[p] = (publicLedger[p] || 0) - (customSplits[p] || 0);
+                        });
+                    } else if (r.participants) {
+                        // 2. 新增修正：若無自訂金額，但有設定「不參與分攤者」(從 participants 讀取實際名單)
+                        let parts = String(r.participants).split(',').map(p => p.trim()).filter(Boolean);
+                        if (parts.length > 0) {
+                            const splitAmt = r.amount / parts.length;
+                            parts.forEach(p => { publicLedger[p] = (publicLedger[p] || 0) - splitAmt; });
+                        }
+                    } else {
+                        // 3. 預設防呆：若都無設定，則均分給當時的所有活躍成員
+                        const snapshot = (r.member_snapshot && r.member_snapshot.length > 0) ? r.member_snapshot : fallbackPool;
+                        const splitAmt = r.amount / snapshot.length;
+                        snapshot.forEach(p => { publicLedger[p] = (publicLedger[p] || 0) - splitAmt; });
+                    }
                 });
                 
                 const hasPublicTransactions = totalPublicContributions > 0 || publicExpense > 0 || otherPublicIncome > 0;
